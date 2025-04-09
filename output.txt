@@ -10,7 +10,7 @@ Hello from ESP32!
 Hello from ESP32!
 Hello from ESP32!
 Hello from ESP32!
-Hello from ESP32!
+Hello from ESP32
 Hello from ESP32!
 Hello from ESP32!
 Hello from ESP32!

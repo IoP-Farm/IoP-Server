@@ -5,22 +5,19 @@
 // ===== Конфигурация =====
 struct Config {
   struct {
-    //const char* ssid = "320_Wi-Fi5";
-    //const char* password = "cat4rsys";
-
-    const char* ssid = "&Dolgopniki";
-    const char* password = "KSP_kr0t0vuxa";
+    const char* ssid = "&Dolgopniki_5G";    // Замените на свои данные
+    const char* password = "KSP_kr0t0vuxa";  // Замените на свои данные
   } wifi;
   
   struct {
-    const char* server = "103.137.250.154"; // Адрес MQTT-брокера
+    const char* server = "103.137.250.154";
     int port = 1883;
     const char* clientId = "farm_001";
     const char* topicData = "farm/data";
     const char* topicControl = "farm/control";
   } mqtt;
   
-  unsigned long updateInterval = 10000; // Интервал отправки данных (мс)
+  unsigned long updateInterval = 10000;
 };
 
 // ===== Глобальные объекты =====
@@ -32,11 +29,10 @@ unsigned long lastUpdate = 0;
 // ===== Имитация датчиков =====
 class VirtualSensors {
 private:
-  // Инициализация генератора случайных чисел
   void initRandom() {
     static bool seeded = false;
     if (!seeded) {
-      randomSeed(analogRead(A0));  // Используем "шум" с аналогового пина
+      randomSeed(analogRead(36));  // Используем GPIO36 (Analog A0)
       seeded = true;
     }
   }
@@ -44,17 +40,17 @@ private:
 public:
   float readTemperature() {
     initRandom();
-    return random(180, 301) / 10.0f;  // 18.0°C - 30.0°C
+    return random(180, 301) / 10.0f;
   }
 
   float readHumidity() {
     initRandom();
-    return random(400, 801) / 10.0f;  // 40.0% - 80.0%
+    return random(400, 801) / 10.0f;
   }
 
   float readWaterLevel() {
     initRandom();
-    return random(500, 1001) / 10.0f;  // 50.0% - 100.0%
+    return random(500, 1001) / 10.0f;
   }
 };
 
@@ -62,54 +58,71 @@ public:
 class MyNetworkManager {
 public:
   void connectWiFi() {
-    if (WiFi.status() == WL_CONNECTED) return;
+    if (isWiFiConnected()) return;
     
-    Serial.println("Connecting to WiFi...");
+    WiFi.disconnect(true);
+    delay(100);
+    WiFi.mode(WIFI_STA);
+    
+    Serial.print("\nПодключение к ");
+    Serial.println(config.wifi.ssid);
+    
     WiFi.begin(config.wifi.ssid, config.wifi.password);
     
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts++ < 20) {
+    unsigned long start = millis();
+    while (!isWiFiConnected() && millis() - start < 20000) {
       delay(500);
       Serial.print(".");
     }
     
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\nWiFi connected! IP: " + WiFi.localIP());
+    if (isWiFiConnected()) {
+      Serial.print("\nПодключено! IP: ");
+      Serial.println(WiFi.localIP());
     } else {
-      Serial.println("\nWiFi connection failed!");
+      Serial.println("\nОшибка подключения!");
+      WiFi.disconnect(true);
     }
   }
 
-  void connectMQTT() {
-    if (mqttClient.connected()) return;
-
-    mqttClient.setServer(config.mqtt.server, config.mqtt.port);
-    mqttClient.setCallback(mqttCallback);
-
-    Serial.println("Connecting to MQTT...");
-    if (mqttClient.connect(config.mqtt.clientId)) {
-      Serial.println("MQTT connected!");
-      mqttClient.subscribe(config.mqtt.topicControl);
-    } else {
-      Serial.println("MQTT connection failed!");
+  void manageMQTT() {
+    if (!mqttClient.connected()) {
+      reconnectMQTT();
     }
+    mqttClient.loop();
   }
 
   void sendData(const String& payload) {
-    if (!mqttClient.connected()) return;
-    
-    mqttClient.publish(config.mqtt.topicData, payload.c_str());
-    Serial.println("Data sent: " + payload);
+    if (mqttClient.connected()) {
+      mqttClient.publish(config.mqtt.topicData, payload.c_str());
+    }
   }
 
 private:
-  static void mqttCallback(char* topic, byte* payload, unsigned int length) {
-    String message;
-    for (unsigned int i = 0; i < length; i++) {
-      message += (char)payload[i];
+  bool isWiFiConnected() {
+    return WiFi.status() == WL_CONNECTED;
+  }
+
+  void reconnectMQTT() {
+    static unsigned long lastTry;
+    
+    if (millis() - lastTry < 5000) return;
+    lastTry = millis();
+    
+    Serial.println("Подключение к MQTT...");
+    
+    mqttClient.setServer(config.mqtt.server, config.mqtt.port);
+    mqttClient.setCallback([](char* topic, byte* payload, unsigned int len) {
+      String msg;
+      for (unsigned int i = 0; i < len; i++) msg += (char)payload[i];
+      Serial.printf("Команда [%s]: %s\n", topic, msg.c_str());
+    });
+    
+    if (mqttClient.connect(config.mqtt.clientId)) {
+      mqttClient.subscribe(config.mqtt.topicControl);
+      Serial.println("MQTT подключен!");
+    } else {
+      Serial.println("Ошибка MQTT!");
     }
-    Serial.println("Received command: " + message);
-    // Здесь обрабатываем команды
   }
 };
 
@@ -119,18 +132,17 @@ VirtualSensors sensors;
 
 void setup() {
   Serial.begin(115200);
+  Serial.print("MAC: ");
+  Serial.println(WiFi.macAddress());
   network.connectWiFi();
-  network.connectMQTT();
 }
 
 void loop() {
   network.connectWiFi();
-  network.connectMQTT();
-  mqttClient.loop();
+  network.manageMQTT();
 
-  // Отправка данных по таймеру
   if (millis() - lastUpdate >= config.updateInterval) {
-    DynamicJsonDocument doc(256);
+    StaticJsonDocument<200> doc;
     doc["device_id"] = config.mqtt.clientId;
     doc["temperature"] = sensors.readTemperature();
     doc["humidity"] = sensors.readHumidity();
@@ -141,5 +153,7 @@ void loop() {
     network.sendData(payload);
     
     lastUpdate = millis();
+    Serial.println("Отправлено: " + payload);
   }
+  delay(100);
 }

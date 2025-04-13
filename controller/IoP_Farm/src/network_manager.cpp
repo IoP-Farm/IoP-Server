@@ -2,34 +2,6 @@
 
 namespace farm::net
 {
-    // Логгер для сообщений Wi-Fi
-    void WiFiLogger::logError(WiFiError error)
-    {
-        farm::log::SerialLogger logger;
-        switch (error)
-        {
-            case WiFiError::Timeout:
-                logger.error("[WiFi] Ошибка подключения: Превышено время ожидания");
-                break;
-            case WiFiError::InvalidCredentials:
-                logger.error("[WiFi] Ошибка подключения: Неверные учетные данные (SSID или пароль)");
-                break;
-            case WiFiError::HardwareNotFound:
-                logger.error("[WiFi] Ошибка подключения: Wi-Fi адаптер не найден");
-                break;
-            case WiFiError::AlreadyConnected:
-                logger.info("[WiFi] Уже подключено к Wi-Fi");
-                break;
-            case WiFiError::AlreadyConnecting:
-                logger.info("[WiFi] Уже идет попытка подключения к Wi-Fi");
-                break;
-            case WiFiError::Unknown:
-            default:
-                logger.error("[WiFi] Неизвестная ошибка при подключении к Wi-Fi");
-                break;
-        }
-    }
-
     WiFiResult WiFiManager::connect()
     {
         // Если уже подключены, возвращаем успех без ошибок
@@ -86,6 +58,34 @@ namespace farm::net
             WiFiLogger::logError(error);
 
             return {false, error}; 
+        }
+    }
+
+    // Логгер для сообщений Wi-Fi
+    void WiFiLogger::logError(WiFiError error)
+    {
+        farm::log::SerialLogger logger;
+        switch (error)
+        {
+            case WiFiError::Timeout:
+                logger.error("[WiFi] Ошибка подключения: Превышено время ожидания");
+                break;
+            case WiFiError::InvalidCredentials:
+                logger.error("[WiFi] Ошибка подключения: Неверные учетные данные (SSID или пароль)");
+                break;
+            case WiFiError::HardwareNotFound:
+                logger.error("[WiFi] Ошибка подключения: Wi-Fi адаптер не найден");
+                break;
+            case WiFiError::AlreadyConnected:
+                logger.info("[WiFi] Уже подключено к Wi-Fi");
+                break;
+            case WiFiError::AlreadyConnecting:
+                logger.info("[WiFi] Уже идет попытка подключения к Wi-Fi");
+                break;
+            case WiFiError::Unknown:
+            default:
+                logger.error("[WiFi] Неизвестная ошибка при подключении к Wi-Fi");
+                break;
         }
     }
 

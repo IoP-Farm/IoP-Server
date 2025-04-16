@@ -2,6 +2,9 @@
 #include <sqlite3.h>
 #include <mqtt/async_client.h>
 #include <nlohmann/json.hpp>
+#include <thread>
+#include <chrono>
+
 
 using namespace std;
 using json = nlohmann::json;
@@ -9,7 +12,7 @@ using json = nlohmann::json;
 // Конфигурация
 const string MQTT_BROKER = "tcp://localhost:1883";
 const string MQTT_TOPIC = "/data";
-const string DB_FILE = "data.db";
+const string DB_FILE = "/home/tovarichkek/services/data_server_farm/data.db";
 
 class MQTTListener : public virtual mqtt::callback {
     sqlite3* db;
@@ -72,7 +75,11 @@ int main() {
         
         cout << "Service started. Press Enter to exit..." << endl;
         cin.get();
-        
+
+        while(true){    
+		std::this_thread::sleep_for(std::chrono::seconds(20));
+	}; //Что я делаю
+
         client.unsubscribe(MQTT_TOPIC)->wait();
         client.disconnect()->wait();
     }

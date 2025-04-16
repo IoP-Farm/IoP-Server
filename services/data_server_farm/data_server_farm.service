@@ -1,0 +1,15 @@
+[Unit]
+Description=MQTT Data Farm to server Subscriber Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/home/tovarichkek/services/server_farm_data
+ExecStart=DATA
+StandardOutput=append:/var/log/mqtt_data.log
+StandardError=append:/var/log/mqtt_data.log
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

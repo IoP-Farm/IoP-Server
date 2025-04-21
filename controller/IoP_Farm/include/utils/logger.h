@@ -9,7 +9,7 @@ namespace farm::log
     // Константы для логгера
     namespace constants
     {
-        constexpr size_t LOG_BUFFER_SIZE = 256;  // Размер буфера для форматирования сообщений
+        constexpr size_t LOG_BUFFER_SIZE   = 256;  // Размер буфера для форматирования сообщений
         constexpr const char* ERROR_PREFIX = "[ERROR] ";
         constexpr const char* WARN_PREFIX  = "[WARN]  ";
         constexpr const char* INFO_PREFIX  = "[INFO]  ";

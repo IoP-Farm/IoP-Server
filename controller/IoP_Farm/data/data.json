@@ -1,0 +1,8 @@
+{
+  "temperature_DHT22": 25.0,
+  "temperature_DS18B20": 24.5,
+  "humidity": 60.0,
+  "water_level": 85.0,
+  "soil_moisture": 45.0,
+  "light_intensity": 75.0
+} 

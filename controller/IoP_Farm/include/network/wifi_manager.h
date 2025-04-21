@@ -1,17 +1,14 @@
 #pragma once
 
 #include <WiFiManager.h>
-#include "../utils/logger_factory.h"
+#include "utils/logger_factory.h"
+#include "config/constants.h"
 
 namespace farm::net
 {
-    // Константы для работы с WiFi
-    constexpr unsigned int WIFI_CONNECT_TIMEOUT = 10;      // Таймаут подключения (секунды)
-    constexpr unsigned int WIFI_PORTAL_TIMEOUT = 0;        // Бесконечное ожидание в портале (0 = бесконечно)
-    constexpr unsigned long WIFI_CHECK_INTERVAL = 5000;    // 5 секунд между проверками соединения
-    constexpr uint8_t MAX_RECONNECT_ATTEMPTS = 3;          // Максимальное количество попыток переподключения
-    constexpr unsigned long RECONNECT_RETRY_INTERVAL = 5000; // 5 секунд между попытками переподключения
-
+    // Используем пространство имен для констант WiFi
+    using namespace farm::config::wifi;
+    
     // Упрощенная обертка над WiFiManager от tzapu
     class MyWiFiManager
     {
@@ -35,16 +32,16 @@ namespace farm::net
         unsigned long lastReconnectTime = 0;
         
         // Настройки точки доступа
-        String apName = "IoP-Farm";
-        String apPassword = "";
-        String hostName = "";
+        String apName     = DEFAULT_AP_NAME;
+        String apPassword = DEFAULT_AP_PASSWORD;
+        String hostName   = DEFAULT_HOSTNAME;
 
     public:
         // Конструктор
         explicit MyWiFiManager(std::shared_ptr<farm::log::ILogger> logger = nullptr);
         
         // Установка имени и пароля точки доступа
-        void setAccessPointCredentials(const String& name, const String& password = "");
+        void setAccessPointCredentials(const String& name, const String& password = DEFAULT_AP_PASSWORD);
         
         // Установка имени хоста
         void setHostName(const String& name);

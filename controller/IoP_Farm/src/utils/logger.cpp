@@ -1,4 +1,4 @@
-#include "../../include/utils/logger.h"
+#include "utils/logger.h"
 #include <stdarg.h>
 
 namespace farm::log
@@ -24,7 +24,7 @@ namespace farm::log
             case Level::Info:    return constants::INFO_PREFIX;
             case Level::Debug:   return constants::DEBUG_PREFIX;
             case Level::Test:    return constants::TEST_PREFIX;
-            default:            return "";
+            default:             return "";
         }
     }
 

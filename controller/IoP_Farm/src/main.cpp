@@ -1,25 +1,39 @@
 #include <Arduino.h>
 #include "network/wifi_manager.h"
 #include "utils/logger_factory.h"
+#include "config/config_manager.h"
 #include <vector>
+
+#ifdef IOP_DEBUG
+#include "unit/test_config_manager.h"
+#endif
+
+using namespace farm::config;
+using namespace farm::log;
+using namespace farm::net;
 
 // Создаем логгер и WiFiManager
 #ifdef IOP_DEBUG
-auto logger = farm::log::LoggerFactory::createSerialLogger(farm::log::Level::Debug);
+auto logger = LoggerFactory::createSerialLogger(Level::Debug);
 #else
-auto logger = farm::log::LoggerFactory::createSerialLogger(farm::log::Level::Info);
+auto logger = LoggerFactory::createSerialLogger(Level::Info);
 #endif
 
-farm::net::MyWiFiManager wifiManager(logger);
+MyWiFiManager wifiManager(logger);
+std::shared_ptr<ConfigManager> configManager = ConfigManager::getInstance(logger);
 
 void setup() 
 {
     // Инициализация Serial
     Serial.begin(115200);
     delay(1000);
+
+    // Инициализация хранилища конфигураций
+    configManager->initialize();
     
     // Инициализация WiFi с автоподключением
     wifiManager.initialize();
+
 }
 
 void loop() 

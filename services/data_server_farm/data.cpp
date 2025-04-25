@@ -9,7 +9,7 @@ using namespace std;
 using json = nlohmann::json;
 
 const string MQTT_BROKER = "tcp://localhost:1883";
-const string MQTT_TOPIC = "/data";
+const string MQTT_TOPIC = "/farm001/data";
 const string DB_FILE = "/home/tovarichkek/services/data_server_farm/data.db";
 
 class MQTTListener : public virtual mqtt::callback {

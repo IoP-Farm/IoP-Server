@@ -4,13 +4,27 @@
 #include <chrono>
 #include <ctime>
 #include <thread>
+#include <vector>
 #include <boost/asio.hpp>
 #include <sqlite3.h>
 #include <nlohmann/json.hpp>
+#include <arpa/inet.h>
 
 namespace asio = boost::asio;
 using boost::asio::ip::tcp;
 using json = nlohmann::json;
+
+#pragma pack(push, 1)
+struct SensorData {
+    int64_t timestamp_unix;
+    double temperature_DHT22;
+    double temperature_DS18B20;
+    double humidity;
+    double water_level;
+    double soil_moisture;
+    double light_intensity;
+};
+#pragma pack(pop)
 
 const std::string DB_PATH = "/home/tovarichkek/services/data_server_farm/data.db";
 const int TCP_PORT = 1488;
@@ -18,41 +32,6 @@ const std::string LOG_FILE = "/var/log/data_to_phone.log";
 
 class Database {
     sqlite3* db;
-    
-    std::tm get_target_date(int day_number) {
-        auto now = std::chrono::system_clock::now();
-        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-        std::tm tm_current = *std::localtime(&now_time);
-
-        // Пробуем текущий месяц
-        std::tm tm_target = tm_current;
-        tm_target.tm_mday = day_number;
-        tm_target.tm_isdst = -1;
-        std::mktime(&tm_target);
-
-        // Проверяем валидность даты
-        bool valid_current_month = 
-            (tm_target.tm_mon == tm_current.tm_mon) &&
-            (tm_target.tm_year == tm_current.tm_year) &&
-            (now_time >= std::mktime(&tm_target));
-
-        if(!valid_current_month) {
-            // Пробуем предыдущий месяц
-            tm_target = tm_current;
-            tm_target.tm_mon--;
-            tm_target.tm_mday = day_number;
-            tm_target.tm_isdst = -1;
-            std::mktime(&tm_target);
-
-            // Если день не существует, берем последний день месяца
-            if(tm_target.tm_mday != day_number) {
-                tm_target.tm_mday = 0;
-                std::mktime(&tm_target);
-            }
-        }
-
-        return tm_target;
-    }
 
 public:
     Database() {
@@ -65,60 +44,37 @@ public:
         sqlite3_close(db);
     }
 
-    json get_day_data(int day_number) {
-        std::tm tm_target = get_target_date(day_number);
-
-        // Начало дня
-        std::tm tm_start = tm_target;
-        tm_start.tm_hour = 0;
-        tm_start.tm_min = 0;
-        tm_start.tm_sec = 0;
-        std::time_t start_time = std::mktime(&tm_start);
-
-        // Конец дня
-        std::tm tm_end = tm_target;
-        tm_end.tm_hour = 23;
-        tm_end.tm_min = 59;
-        tm_end.tm_sec = 59;
-        std::time_t end_time = std::mktime(&tm_end);
-
-        std::string start_str = time_to_string(std::chrono::system_clock::from_time_t(start_time));
-        std::string end_str = time_to_string(std::chrono::system_clock::from_time_t(end_time));
-
-        json result = json::array();
+    std::vector<SensorData> get_data(int64_t unix_from, int64_t unix_to) {
+        std::vector<SensorData> results;
+        
         sqlite3_stmt* stmt;
-        const char* sql = "SELECT timestamp, data FROM sensor_data "
-                          "WHERE timestamp BETWEEN ? AND ? "
-                          "ORDER BY timestamp;";
+        const char* sql = "SELECT "
+                           "timestamp_unix, temperature_DHT22, "
+                           "temperature_DS18B20, humidity, water_level, "
+                           "soil_moisture, light_intensity "
+                           "FROM sensor_data "
+                           "WHERE timestamp_unix BETWEEN ? AND ? "
+                           "ORDER BY timestamp_unix;";
 
         if(sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
-            sqlite3_bind_text(stmt, 1, start_str.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(stmt, 2, end_str.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_int64(stmt, 1, unix_from);
+            sqlite3_bind_int64(stmt, 2, unix_to);
 
             while(sqlite3_step(stmt) == SQLITE_ROW) {
-                const char* timestamp = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-                const char* data_str = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+                SensorData data;
+                data.timestamp_unix = sqlite3_column_int64(stmt, 0);
+                data.temperature_DHT22 = sqlite3_column_double(stmt, 1);
+                data.temperature_DS18B20 = sqlite3_column_double(stmt, 2);
+                data.humidity = sqlite3_column_double(stmt, 3);
+                data.water_level = sqlite3_column_double(stmt, 4);
+                data.soil_moisture = sqlite3_column_double(stmt, 5);
+                data.light_intensity = sqlite3_column_double(stmt, 6);
                 
-                try {
-                    json data = json::parse(data_str);
-                    data["timestamp"] = timestamp;
-                    result.push_back(data);
-                }
-                catch(const json::parse_error& e) {
-                    std::cerr << "JSON parse error: " << e.what() << std::endl;
-                }
+                results.push_back(data);
             }
             sqlite3_finalize(stmt);
         }
-        return result;
-    }
-
-private:
-    std::string time_to_string(const std::chrono::system_clock::time_point& tp) {
-        std::time_t time = std::chrono::system_clock::to_time_t(tp);
-        char buffer[20];
-        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&time));
-        return buffer;
+        return results;
     }
 };
 
@@ -133,7 +89,7 @@ public:
         }
     }
 
-    void log(const std::string& ip, int day_number, const json& response) {
+    void log(const std::string& ip, int64_t from, int64_t to, size_t count) {
         auto now = std::chrono::system_clock::now();
         std::time_t now_time = std::chrono::system_clock::to_time_t(now);
         char time_str[20];
@@ -141,11 +97,25 @@ public:
         
         log_file << time_str 
                 << " | IP: " << ip
-                << " | Day number: " << day_number
-                << " | Records sent: " << response.size()
+                << " | From: " << from
+                << " | To: " << to
+                << " | Records sent: " << count
                 << std::endl;
     }
 };
+
+void send_binary_data(tcp::socket& socket, const std::vector<SensorData>& data) {
+    // Отправляем количество записей
+    uint32_t count = htonl(data.size());
+    asio::write(socket, asio::buffer(&count, sizeof(count)));
+
+    // Отправляем сами данные
+    if(!data.empty()) {
+        const char* buffer = reinterpret_cast<const char*>(data.data());
+        size_t bytes = data.size() * sizeof(SensorData);
+        asio::write(socket, asio::buffer(buffer, bytes));
+    }
+}
 
 void handle_client(tcp::socket socket, Database& db, Logger& logger) {
     try {
@@ -159,22 +129,22 @@ void handle_client(tcp::socket socket, Database& db, Logger& logger) {
         std::getline(is, request_str);
         
         auto request = json::parse(request_str);
-        if(!request.contains("data") || !request["data"].is_number()) {
+        if(!request.contains("unix_time_from") || !request.contains("unix_time_to")) {
             throw std::runtime_error("Invalid request format");
         }
         
-        int day_number = request["data"];
-        if(day_number < 1 || day_number > 31) {
-            throw std::runtime_error("Day number out of range");
+        int64_t unix_from = request["unix_time_from"];
+        int64_t unix_to = request["unix_time_to"];
+        
+        if(unix_from > unix_to) {
+            throw std::runtime_error("Invalid time range");
         }
+
+        auto data = db.get_data(unix_from, unix_to);
+        send_binary_data(socket, data);
         
-        auto response = db.get_day_data(day_number);
-        
-        std::string response_str = response.dump() + "\n";
-        asio::write(socket, asio::buffer(response_str));
-        
-        logger.log(client_ip, day_number, response);
-        std::cout << "Sent " << response.size() 
+        logger.log(client_ip, unix_from, unix_to, data.size());
+        std::cout << "Sent " << data.size() 
                  << " records to " << client_ip << std::endl;
     }
     catch(const std::exception& e) {

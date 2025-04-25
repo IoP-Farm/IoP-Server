@@ -12,10 +12,10 @@ namespace asio = boost::asio;
 using boost::asio::ip::tcp;
 using json = nlohmann::json;
 
-// Конфигурация
+// Конфигурация (изменённые значения)
 const std::string MQTT_BROKER = "tcp://localhost:1883";
-const std::string MQTT_TOPIC = "/farm001/config";
-const int TCP_PORT = 1489;
+const std::string MQTT_TOPIC = "/farm001/command";  // Изменён топик
+const int TCP_PORT = 1490;                         // Изменён порт
 const std::string LOG_FILE = "/var/log/phone_command.log";
 
 class Logger {
@@ -53,7 +53,7 @@ public:
     }
 
     void send_message(const std::string& payload) {
-        auto msg = mqtt::make_message(MQTT_TOPIC, payload);
+        auto msg = mqtt::make_message(MQTT_TOPIC, payload);  // Отправка в новый топик
         msg->set_qos(1);
         client.publish(msg)->wait();
     }
@@ -70,8 +70,7 @@ void handle_client(tcp::socket socket, MqttSender& sender, Logger& logger) {
         std::string data;
         std::getline(is, data);
         
-        // Явно используем результат парсинга
-        json parsed_config = json::parse(data); // Валидация JSON
+        json parsed_config = json::parse(data);
         
         logger.log(client_ip, data);
         sender.send_message(data);
@@ -85,12 +84,11 @@ void handle_client(tcp::socket socket, MqttSender& sender, Logger& logger) {
 
 int main() {
     try {
-        // Создание лог-файла с правами
         std::ofstream tmp(LOG_FILE, std::ios::app);
         tmp.close();
 
         asio::io_context io_context;
-        tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), TCP_PORT));
+        tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), TCP_PORT));  // Порт 1490
         MqttSender sender;
         Logger logger;
 

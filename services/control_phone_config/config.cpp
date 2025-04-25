@@ -15,7 +15,7 @@ using json = nlohmann::json;
 // Конфигурация
 const std::string MQTT_BROKER = "tcp://localhost:1883";
 const std::string MQTT_TOPIC = "/control";
-const int TCP_PORT = 1488;
+const int TCP_PORT = 1489;
 const std::string LOG_FILE = "/var/log/phone_command.log";
 
 class Logger {

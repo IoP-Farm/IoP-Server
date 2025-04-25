@@ -13,7 +13,7 @@ using boost::asio::ip::tcp;
 using json = nlohmann::json;
 
 const std::string DB_PATH = "/home/tovarichkek/services/data_server_farm/data.db";
-const int TCP_PORT = 1489;
+const int TCP_PORT = 1488;
 const std::string LOG_FILE = "/var/log/data_to_phone.log";
 
 class Database {

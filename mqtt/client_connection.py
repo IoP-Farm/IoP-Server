@@ -27,6 +27,21 @@ def get_last_n_records(n=30, devid=1):
     conn.close()
     return obj2bin(records);
 
+def get_records_for_period(timefrom, timeto, devid=1):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute(f"""
+        SELECT device_id, temperature, humidity, water_level, timestamp
+        FROM farm_data
+        WHERE device_id={devid}
+        WHERE timestamp BETWEEN {timefrom} AND {timeto}
+        ORDER BY timestamp DESC
+    """)
+    records = cursor.fetchall()
+    conn.close()
+    return obj2bin(records)
+
+
 def obj2bin(data):
     bytes = []
     bytes = bytes + bytearray(struct.pack("d", len(data)))
@@ -52,7 +67,6 @@ tcp_socket.listen(1)
  
 while True:
     connection, client = tcp_socket.accept()
- 
     try:
         #TODO: change the config bytesize to match client side's + metadata
         flag = connection.recv(1)

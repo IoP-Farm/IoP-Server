@@ -126,13 +126,5 @@ namespace farm::config
         
         // Обновление конфигурации из JSON строки
         bool updateFromJson(ConfigType type, const String& jsonString);
-        
-        // Методы для формирования полных топиков MQTT
-        String getDataTopic() const;      // Получить топик для данных
-        String getConfigTopic() const;    // Получить топик для конфигурации
-        String getCommandTopic() const;   // Получить топик для команд
-        
-        // Проверка, настроен ли MQTT
-        bool isMqttConfigured() const;
     };
 }

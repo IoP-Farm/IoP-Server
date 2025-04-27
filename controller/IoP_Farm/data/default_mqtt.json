@@ -1,7 +1,5 @@
 {
     "host": "",
     "port": -1,
-    "deviceId": "farm001",
-    "username": "",
-    "password": ""
+    "deviceId": "farm001"
 }

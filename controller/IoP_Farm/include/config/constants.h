@@ -30,6 +30,16 @@ namespace farm::config
         constexpr const char* DATA_SUFFIX    = "/data";          // Суффикс для топика данных
         constexpr const char* CONFIG_SUFFIX  = "/config";      // Суффикс для топика конфигурации
         constexpr const char* COMMAND_SUFFIX = "/command";    // Суффикс для топика команд
+        
+        // Константы для работы с MQTT подключением
+        constexpr unsigned long CHECK_INTERVAL = 5000;           // 5 секунд между проверками соединения
+        constexpr uint8_t MAX_RECONNECT_ATTEMPTS = 1;           // Максимальное количество попыток переподключения
+        constexpr unsigned long RECONNECT_RETRY_INTERVAL = 10000; // 10 секунд между попытками переподключения
+        
+        // Уровни QoS (Quality of Service)
+        constexpr uint8_t QOS_0 = 0;  // At most once - сообщение доставляется максимум один раз (или не доставляется вообще)
+        constexpr uint8_t QOS_1 = 1;  // At least once - сообщение доставляется минимум один раз (возможны дубликаты)
+        constexpr uint8_t QOS_2 = 2;  // Exactly once - сообщение доставляется ровно один раз (без дубликатов)
     }
 
     // Константы для WiFi
@@ -45,6 +55,15 @@ namespace farm::config
         constexpr unsigned long CHECK_INTERVAL = 5000;        // 5 секунд между проверками соединения
         constexpr uint8_t MAX_RECONNECT_ATTEMPTS = 3;         // Максимальное количество попыток переподключения
         constexpr unsigned long RECONNECT_RETRY_INTERVAL = 5000; // 5 секунд между попытками переподключения
+
+        // Константы для MQTT параметров в портале конфигурации
+        constexpr const char* MQTT_SERVER_PARAM_ID = "mqtt_server";    // ID параметра сервера MQTT
+        constexpr const char* MQTT_SERVER_PARAM_LABEL = "MQTT Server"; // Метка параметра сервера MQTT
+        constexpr size_t MQTT_SERVER_PARAM_LENGTH = 40;                // Максимальная длина адреса сервера
+        constexpr const char* MQTT_PORT_PARAM_ID = "mqtt_port";        // ID параметра порта MQTT
+        constexpr const char* MQTT_PORT_PARAM_LABEL = "MQTT Port";     // Метка параметра порта MQTT
+        constexpr size_t MQTT_PORT_PARAM_LENGTH = 6;                   // Максимальная длина порта
+        constexpr const char* MQTT_DEFAULT_PORT = "1883";              // Порт MQTT по умолчанию
     }
 
     // Константы для JSON документов

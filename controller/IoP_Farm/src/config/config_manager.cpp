@@ -9,6 +9,10 @@
 
 namespace farm::config
 {
+    // Использование сокращений для более компактного кода
+    using farm::log::Level;
+    using farm::log::LoggerFactory;
+    
     // Инициализация статического экземпляра
     std::shared_ptr<ConfigManager> ConfigManager::instance = nullptr;
 
@@ -22,14 +26,14 @@ namespace farm::config
         // Если логгер не передан, создаем новый с помощью фабрики
         if (!logger) 
         {
-            this->logger = farm::log::LoggerFactory::createSerialLogger(farm::log::Level::Info);
+            this->logger = LoggerFactory::createSerialLogger(Level::Info);
         } 
         else 
         {
             this->logger = logger;
         }
         
-        this->logger->log(farm::log::Level::Info, "[Config] Инициализация менеджера конфигурации");
+        this->logger->log(Level::Info, "[Config] Инициализация ConfigManager");
     }
 
     // Получение экземпляра синглтона
@@ -45,70 +49,66 @@ namespace farm::config
 
     ConfigManager::~ConfigManager()
     {
-        logger->log(farm::log::Level::Debug, "[Config] Освобождение памяти");
+        logger->log(Level::Debug, "[Config] Освобождение памяти ConfigManager");
 
         // Освобождаем все JSON документы
         dataConfig.clear();
         systemConfig.clear();
         commandConfig.clear();
         mqttConfig.clear();
-
-        logger->log(farm::log::Level::Debug, "[Config] Освобождение памяти завершено");
     }
 
     // Инициализация SPIFFS
     bool ConfigManager::initialize()
     {
-        logger->log(farm::log::Level::Info, "[Config] Инициализация файловой системы");
+        logger->log(Level::Info, "[Config] Инициализация SPIFFS");
         
         if (!SPIFFS.begin(true)) {
-            logger->log(farm::log::Level::Error, "[Config] Ошибка инициализации SPIFFS");
+            logger->log(Level::Error, "[Config] Ошибка инициализации SPIFFS");
             return false;
         }
-        
-        logger->log(farm::log::Level::Info, "[Config] SPIFFS инициализирована успешно");
         
         // Проверяем наличие всех необходимых файлов
         bool allFilesExist = true;
         
         // Проверка дефолтных файлов конфигурации
         if (!SPIFFS.exists(paths::DEFAULT_DATA_CONFIG)) {
-            logger->log(farm::log::Level::Error, 
-                       "[Config] Отсутствует дефолтный файл конфигурации данных: %s", 
+            logger->log(Level::Error, 
+                       "[Config] Отсутствует файл: %s", 
                        paths::DEFAULT_DATA_CONFIG);
             allFilesExist = false;
         }
         
         if (!SPIFFS.exists(paths::DEFAULT_SYSTEM_CONFIG)) {
-            logger->log(farm::log::Level::Error, 
-                       "[Config] Отсутствует дефолтный файл системной конфигурации: %s", 
+            logger->log(Level::Error, 
+                       "[Config] Отсутствует файл: %s", 
                        paths::DEFAULT_SYSTEM_CONFIG);
             allFilesExist = false;
         }
         
         if (!SPIFFS.exists(paths::DEFAULT_COMMAND_CONFIG)) {
-            logger->log(farm::log::Level::Error, 
-                       "[Config] Отсутствует дефолтный файл конфигурации команд: %s", 
+            logger->log(Level::Error, 
+                       "[Config] Отсутствует файл: %s", 
                        paths::DEFAULT_COMMAND_CONFIG);
             allFilesExist = false;
         }
         
         if (!SPIFFS.exists(paths::DEFAULT_MQTT_CONFIG)) {
-            logger->log(farm::log::Level::Error, 
-                       "[Config] Отсутствует дефолтный файл конфигурации MQTT: %s", 
+            logger->log(Level::Error, 
+                       "[Config] Отсутствует файл: %s", 
                        paths::DEFAULT_MQTT_CONFIG);
             allFilesExist = false;
         }
 
         if (!allFilesExist) {
-            logger->log(farm::log::Level::Error, 
-                       "[Config] Отсутствуют необходимые дефолтные файлы конфигурации. "
+            logger->log(Level::Error, 
+                       "[Config] Отсутствуют необходимые файлы. "
                        "Убедитесь, что файлы загружены в SPIFFS с помощью команды: "
                        "pio run --target uploadfs");
             return false;
         }
 
-        logger->log(farm::log::Level::Info, "[Config] Очистка всех конфигураций и загрузка дефолтных настроек");
+        logger->log(Level::Info, "[Config] Загрузка стандартных настроек");
 
         // Очистка всех конфигураций после перезагрузки устройства
         clearAllConfigs();
@@ -116,7 +116,6 @@ namespace farm::config
         // Загрузка всех дефолтных конфигураций
         loadAllDefaultConfigs();
 
-        logger->log(farm::log::Level::Info, "[Config] Настройки загружены успешно");
         return true;
     }
 
@@ -125,7 +124,7 @@ namespace farm::config
         // Очистка конфигурации указанного типа
         auto& doc = getConfigDocument(type);
         doc.clear();
-        logger->log(farm::log::Level::Debug, "[Config] Конфигурация %s очищена", getConfigPath(type));
+        logger->log(Level::Debug, "[Config] %s очищен", getConfigPath(type));
         return saveConfig(type);
     }
 
@@ -144,7 +143,7 @@ namespace farm::config
     bool ConfigManager::deleteConfig(ConfigType type)
     {
         const char* path = getConfigPath(type);
-        logger->log(farm::log::Level::Warning, "[Config] Удаление конфигурации %s", path);
+        logger->log(Level::Warning, "[Config] Удаление %s", path);
         return SPIFFS.remove(path);
     }
 
@@ -164,14 +163,14 @@ namespace farm::config
     bool ConfigManager::loadJsonFromFile(const char* path, JsonDocument& doc)
     {
         if (!SPIFFS.exists(path)) {
-            logger->log(farm::log::Level::Warning, 
+            logger->log(Level::Warning, 
                       "[Config] Файл '%s' не существует", path);
             return false;
         }
         
         File file = SPIFFS.open(path, "r");
         if (!file) {
-            logger->log(farm::log::Level::Error, 
+            logger->log(Level::Error, 
                       "[Config] Не удалось открыть файл '%s'", path);
             return false;
         }
@@ -180,13 +179,11 @@ namespace farm::config
         file.close();
         
         if (error) {
-            logger->log(farm::log::Level::Error, 
+            logger->log(Level::Error, 
                       "[Config] Ошибка десериализации JSON: %s", error.c_str());
             return false;
         }
-        
-        logger->log(farm::log::Level::Debug, 
-                  "[Config] Файл '%s' успешно загружен", path);
+
         return true;
     }
 
@@ -195,21 +192,21 @@ namespace farm::config
     {
         File file = SPIFFS.open(path, "w");
         if (!file) {
-            logger->log(farm::log::Level::Error, 
+            logger->log(Level::Error, 
                       "[Config] Не удалось открыть файл '%s' для записи", path);
             return false;
         }
         
         if (serializeJson(doc, file) == 0) {
-            logger->log(farm::log::Level::Error, 
+            logger->log(Level::Error, 
                       "[Config] Ошибка сериализации JSON в файл '%s'", path);
             file.close();
             return false;
         }
         
         file.close();
-        logger->log(farm::log::Level::Debug, 
-                  "[Config] Файл '%s' успешно сохранен", path);
+        logger->log(Level::Debug, 
+                  "[Config] '%s' сохранен в SPIFFS", path);
         return true;
     }
 
@@ -226,8 +223,8 @@ namespace farm::config
             case ConfigType::Mqtt:
                 return paths::MQTT_CONFIG;
             default:
-                logger->log(farm::log::Level::Error, 
-                          "[Config] Неизвестный тип конфигурации");
+                logger->log(Level::Error, 
+                          "[Config] Неизвестный тип настроек");
                 return "";
         }
     }
@@ -245,8 +242,8 @@ namespace farm::config
             case ConfigType::Mqtt:
                 return paths::DEFAULT_MQTT_CONFIG;
             default:
-                logger->log(farm::log::Level::Error, 
-                          "[Config] Неизвестный тип конфигурации для дефолтного файла");
+                logger->log(Level::Error, 
+                          "[Config] Неизвестный тип стандартных настроек");
                 return "";
         }
     }
@@ -265,8 +262,8 @@ namespace farm::config
             case ConfigType::Mqtt:
                 return mqttConfig;
             default:
-                logger->log(farm::log::Level::Error, 
-                          "[Config] Неизвестный тип конфигурации");
+                logger->log(Level::Error, 
+                          "[Config] Неизвестный тип настроек");
                 return dataConfig; // Возвращаем dataConfig как значение по умолчанию
         }
     }
@@ -285,8 +282,8 @@ namespace farm::config
             case ConfigType::Mqtt:
                 return mqttConfig;
             default:
-                logger->log(farm::log::Level::Error, 
-                          "[Config] Неизвестный тип конфигурации");
+                logger->log(Level::Error, 
+                          "[Config] Неизвестный тип настроек");
                 return dataConfig; // Возвращаем dataConfig как значение по умолчанию
         }
     }
@@ -295,23 +292,20 @@ namespace farm::config
     bool ConfigManager::loadDefaultConfig(ConfigType type)
     {
         const char* defaultPath = getDefaultConfigPath(type);
-        auto& doc = getConfigDocument(type);
+        auto& doc               = getConfigDocument(type);
         
-        logger->log(farm::log::Level::Info, 
-                  "[Config] Загрузка дефолтной конфигурации из '%s'", defaultPath);
+        logger->log(Level::Info, 
+                  "[Config] Загрузка стандартных настроек из '%s'", defaultPath);
         
         if (!SPIFFS.exists(defaultPath)) {
-            logger->log(farm::log::Level::Error, 
-                     "[Config] Дефолтный файл '%s' не существует", defaultPath);
+            logger->log(Level::Error, 
+                     "[Config] '%s' отсутствует", defaultPath);
             return false;
         }
         
         if (loadJsonFromFile(defaultPath, doc)) {
             // После загрузки дефолтной конфигурации, сохраняем её в основной файл
             const char* configPath = getConfigPath(type);
-            logger->log(farm::log::Level::Debug, 
-                      "[Config] Создание нового файла '%s' на основе дефолтной конфигурации", 
-                      configPath);
             return saveJsonToFile(configPath, doc);
         }
         
@@ -334,15 +328,15 @@ namespace farm::config
     bool ConfigManager::loadConfig(ConfigType type)
     {
         const char* path = getConfigPath(type);
-        auto& doc = getConfigDocument(type);
+        auto& doc       = getConfigDocument(type);
         
         // Сначала очищаем документ
         doc.clear();
         
         // Если файл не существует, пробуем загрузить дефолтную конфигурацию
         if (!SPIFFS.exists(path)) {
-            logger->log(farm::log::Level::Warning, 
-                      "[Config] Файл '%s' не существует, попытка загрузки дефолтной конфигурации", path);
+            logger->log(Level::Warning, 
+                      "[Config] '%s' отсутствует, попытка загрузки стандартных настроек", path);
             return loadDefaultConfig(type);
         }
         
@@ -352,8 +346,8 @@ namespace farm::config
     // Сохранение конфигурации
     bool ConfigManager::saveConfig(ConfigType type)
     {
-        const char* path = getConfigPath(type);
-        const auto& doc = getConfigDocument(type);
+        const char* path   = getConfigPath(type);
+        const auto& doc    = getConfigDocument(type);
         
         return saveJsonToFile(path, doc);
     }
@@ -368,10 +362,6 @@ namespace farm::config
         success &= loadConfig(ConfigType::Command);
         success &= loadConfig(ConfigType::Mqtt);
         
-        logger->log(farm::log::Level::Info, 
-                  "[Config] Загрузка всех конфигураций %s", 
-                  success ? "успешна" : "завершилась с ошибками");
-        
         return success;
     }
 
@@ -385,8 +375,8 @@ namespace farm::config
         success &= saveConfig(ConfigType::Command);
         success &= saveConfig(ConfigType::Mqtt);
         
-        logger->log(farm::log::Level::Info, 
-                  "[Config] Сохранение всех конфигураций %s", 
+        logger->log(Level::Info, 
+                  "[Config] Сохранение всех настроек %s", 
                   success ? "успешно" : "завершилось с ошибками");
         
         return success;
@@ -420,16 +410,16 @@ namespace farm::config
         // TODO: сделать по-человечески
         if (output.length() <= farm::log::constants::LOG_BUFFER_SIZE - 58)
         {
-            logger->log(farm::log::Level::Info, 
-                      "[Config] Текущая конфигурация %s:\n%s", 
+            logger->log(Level::Info, 
+                      "[Config] Текущий файл %s:\n%s", 
                       getConfigPath(type), output.c_str());
         }
         else 
         {
-            if (logger->getLevel() >= farm::log::Level::Info)
+            if (logger->getLevel() >= Level::Info)
             {
-                logger->log(farm::log::Level::Warning, 
-                        "[Config] Текущая конфигурация %s слишком большая для вывода в лог", 
+                logger->log(Level::Warning, 
+                        "[Config] %s слишком большой для вывода в лог", 
                         getConfigPath(type));
                 Serial.println(output);
             }
@@ -462,7 +452,7 @@ namespace farm::config
         DeserializationError error = deserializeJson(tempDoc, jsonString);
         if (error) 
         {
-            logger->log(farm::log::Level::Error, 
+            logger->log(Level::Error, 
                       "[Config] Ошибка десериализации JSON: %s", error.c_str());
             return false;
         }
@@ -495,8 +485,8 @@ namespace farm::config
                 // Обходим все ключи в источнике
                 for (JsonPair kv : srcObj) 
                 {
-                    const char* key = kv.key().c_str();
-                    JsonVariant srcValue = kv.value();
+                    const char* key       = kv.key().c_str();
+                    JsonVariant srcValue  = kv.value();
                     
                     // Если значение в источнике - объект, рекурсивно сливаем
                     if (srcValue.is<JsonObject>()) 
@@ -520,50 +510,10 @@ namespace farm::config
         // Запускаем рекурсивное слияние
         mergeJson(tempDoc, targetDoc);
         
-        logger->log(farm::log::Level::Info, 
-                  "[Config] Конфигурация %s обновлена из JSON", 
+        logger->log(Level::Info, 
+                  "[Config] %s обновлен из JSON-строки", 
                   getConfigPath(type));
         
         return true;
-    }
-
-    // Проверка, настроен ли MQTT
-    bool ConfigManager::isMqttConfigured() const
-    {
-        // MQTT настроен, если указаны хост и порт
-        return hasKey(ConfigType::Mqtt, "host") && 
-               hasKey(ConfigType::Mqtt, "port") && 
-               mqttConfig["host"].as<String>().length() > 0 && 
-               mqttConfig["port"].as<int16_t>() >= 0;
-    }
-    
-    // Получить топик для данных
-    String ConfigManager::getDataTopic() const
-    {
-        String deviceId = hasKey(ConfigType::Mqtt, "deviceId") 
-            ? mqttConfig["deviceId"].as<String>()
-            : mqtt::DEFAULT_DEVICE_ID;
-            
-        return deviceId + mqtt::DATA_SUFFIX;
-    }
-    
-    // Получить топик для конфигурации
-    String ConfigManager::getConfigTopic() const
-    {
-        String deviceId = hasKey(ConfigType::Mqtt, "deviceId") 
-            ? mqttConfig["deviceId"].as<String>()
-            : mqtt::DEFAULT_DEVICE_ID;
-            
-        return deviceId + mqtt::CONFIG_SUFFIX;
-    }
-    
-    // Получить топик для команд
-    String ConfigManager::getCommandTopic() const
-    {
-        String deviceId = hasKey(ConfigType::Mqtt, "deviceId") 
-            ? mqttConfig["deviceId"].as<String>()
-            : mqtt::DEFAULT_DEVICE_ID;
-            
-        return deviceId + mqtt::COMMAND_SUFFIX;
     }
 }

@@ -1,17 +1,27 @@
-#include "../../include/network/wifi_manager.h"
+#include "network/wifi_manager.h"
+#include "network/mqtt_manager.h"
+#include "config/config_manager.h"
 
 namespace farm::net
 {
-    // Используем константы WiFi
+    // Используем константы WiFi и сокращаем пространства имен
     using namespace farm::config::wifi;
+    using farm::log::Level;
+    using farm::log::LoggerFactory;
+    using farm::config::ConfigType;
+    
+    // Инициализация статического экземпляра
+    std::shared_ptr<MyWiFiManager> MyWiFiManager::instance = nullptr;
     
     // Конструктор
     MyWiFiManager::MyWiFiManager(std::shared_ptr<farm::log::ILogger> logger)
+        : mqttServerParam(MQTT_SERVER_PARAM_ID, MQTT_SERVER_PARAM_LABEL, "", MQTT_SERVER_PARAM_LENGTH),
+          mqttPortParam(MQTT_PORT_PARAM_ID, MQTT_PORT_PARAM_LABEL, MQTT_DEFAULT_PORT, MQTT_PORT_PARAM_LENGTH)
     {
         // Если логгер не передан, создаем новый с помощью фабрики
         if (!logger) 
         {
-            this->logger = farm::log::LoggerFactory::createSerialLogger(farm::log::Level::Info);
+            this->logger = LoggerFactory::createSerialLogger(Level::Info);
         } 
         else 
         {
@@ -27,10 +37,66 @@ namespace farm::net
         // Обратный вызов при активации точки доступа
         wifiManager.setAPCallback([this](WiFiManager* wm) {
             portalActive = true;
-            this->logger->log(farm::log::Level::Info, 
-                     "[WiFi] Портал активирован: %s (пароль: %s)", 
+            this->logger->log(Level::Info, 
+                     "[WiFi] Config Portal активирован: %s (Pass: %s)", 
                      apName.c_str(), apPassword.c_str());
         });
+        
+        // Добавляем параметры в WiFiManager
+        wifiManager.addParameter(&mqttServerParam);
+        wifiManager.addParameter(&mqttPortParam);
+        
+        // Устанавливаем колбэк для сохранения параметров
+        wifiManager.setSaveParamsCallback([this]() { this->saveParamsCallback(); });
+    
+    }
+    
+    // Получение экземпляра синглтона
+    std::shared_ptr<MyWiFiManager> MyWiFiManager::getInstance(std::shared_ptr<farm::log::ILogger> logger)
+    {
+        if (instance == nullptr) 
+        {
+            // Используем явное создание вместо make_shared, т.к. конструктор приватный
+            instance = std::shared_ptr<MyWiFiManager>(new MyWiFiManager(logger));
+        }
+        return instance;
+    }
+    
+    // Деструктор
+    MyWiFiManager::~MyWiFiManager()
+    {
+        logger->log(Level::Debug, "[WiFi] Освобождение ресурсов WiFi Manager");
+    }
+    
+    // Колбэк для сохранения параметров
+    void MyWiFiManager::saveParamsCallback()
+    {
+        // Получаем значения из параметров
+        String mqttServer = mqttServerParam.getValue();
+        String mqttPort   = mqttPortParam.getValue();
+        
+        // Если значения не пустые, сохраняем их
+        if (mqttServer.length() > 0 || mqttPort.length() > 0)
+        {
+            auto mqttManager = MQTTManager::getInstance(logger);
+            
+            // Применяем новые настройки, если они отличаются от текущих
+            if (mqttServer.length() > 0 && mqttServer != mqttManager->getMqttHost())
+            {
+                logger->log(Level::Info, 
+                          "[WiFi] Сохранение новых настроек MQTT: сервер=%s", 
+                          mqttServer.c_str());
+                mqttManager->setMqttHost(mqttServer);
+            }
+            
+            if (mqttPort.length() > 0 && mqttPort.toInt() != mqttManager->getMqttPort())
+            {
+                logger->log(Level::Info, 
+                          "[WiFi] Сохранение новых настроек MQTT: порт=%s", 
+                          mqttPort.c_str());
+                mqttManager->setMqttPort(mqttPort.toInt());
+            }
+        }
     }
     
     // Инициализация WiFi и попытка подключения
@@ -45,7 +111,7 @@ namespace farm::net
         setDebugOutput(true, "[DEBUG] [WM]   ");
 #endif
 
-        logger->log(farm::log::Level::Info, "[WiFi] Инициализация");
+        logger->log(Level::Info, "[WiFi] Инициализация");
         
         // Устанавливаем имя хоста, если оно было задано
         if (hostName.length() > 0) 
@@ -53,8 +119,21 @@ namespace farm::net
             WiFi.setHostname(hostName.c_str());
         }
         
+        // Получаем текущие настройки MQTT для отображения в портале
+        auto mqttManager   = MQTTManager::getInstance(logger);
+        if (mqttManager->isMqttConfigured())
+        {
+            auto configManager   = farm::config::ConfigManager::getInstance(logger);
+            String currentServer = configManager->getValue<String>(ConfigType::Mqtt, "host");
+            int16_t currentPort  = configManager->getValue<int16_t>(ConfigType::Mqtt, "port");
+            
+            // Устанавливаем текущие значения в параметры
+            mqttServerParam.setValue(currentServer.c_str(), MQTT_SERVER_PARAM_LENGTH);
+            mqttPortParam.setValue(String(currentPort).c_str(), MQTT_PORT_PARAM_LENGTH);
+        }
+        
         // Попытка автоматического подключения
-        logger->log(farm::log::Level::Debug, "[WiFi] Запуск автоподключения с таймаутом %d сек", CONNECT_TIMEOUT);
+        logger->log(Level::Debug, "[WiFi] Запуск автоподключения с таймаутом %d сек", CONNECT_TIMEOUT);
         bool connected = wifiManager.autoConnect(
             apName.c_str(), 
             apPassword.length() > 0 ? apPassword.c_str() : nullptr
@@ -64,20 +143,20 @@ namespace farm::net
         {
             // Если подключение успешно, значит настройки были сохранены или введены
             // в процессе работы портала конфигурации
-            logger->log(farm::log::Level::Info, 
+            logger->log(Level::Info, 
                       "[WiFi] Подключено к %s (IP: %s, RSSI: %d дБм)", 
                       WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
             
             // Если подключение произошло к новой сети через портал, дополнительно логируем
             if (portalActive) 
             {
-                logger->log(farm::log::Level::Info,
+                logger->log(Level::Info,
                          "[WiFi] Сохранены новые учетные данные сети");
             }
         }
         else
         {
-            logger->log(farm::log::Level::Warning, 
+            logger->log(Level::Warning, 
                       "[WiFi] Не удалось установить соединение через автоподключение");
         }
         
@@ -96,23 +175,22 @@ namespace farm::net
             // Если подключение установлено через портал
             if (WiFi.status() == WL_CONNECTED) 
             {
-                logger->log(farm::log::Level::Info, 
-                          "[WiFi] Соединение установлено через портал конфигурации");
-                logger->log(farm::log::Level::Info, 
+                logger->log(Level::Info, 
+                          "[WiFi] Соединение установлено через Config Portal");
+                logger->log(Level::Info, 
                           "[WiFi] Сеть: %s, IP: %s", 
                           WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
                 
                 // Закрываем портал только если он действительно активен
                 if (isConfigPortalActive())
                 {
-                    logger->log(farm::log::Level::Debug, "[WiFi] Закрытие портала конфигурации");
+                    logger->log(Level::Debug, "[WiFi] Остановка Config Portal");
                     wifiManager.stopConfigPortal();
                 }
                 
                 // Сбрасываем флаги и счетчики
-                portalActive = false;
+                portalActive      = false;
                 reconnectAttempts = 0;
-                logger->log(farm::log::Level::Debug, "[WiFi] Портал неактивен");
             }
             
             return; // Пока портал активен, не выполняем другие проверки
@@ -129,7 +207,7 @@ namespace farm::net
             {
                 // Первая потеря соединения или продолжающиеся попытки
                 if (reconnectAttempts == 0) {
-                    logger->log(farm::log::Level::Warning, "[WiFi] Соединение потеряно");
+                    logger->log(Level::Warning, "[WiFi] Соединение потеряно");
                 }
                 
                 // Не пытаемся переподключаться слишком часто
@@ -137,15 +215,15 @@ namespace farm::net
                     lastReconnectTime = currentMillis;
                     reconnectAttempts++;
                     
-                    logger->log(farm::log::Level::Debug, 
+                    logger->log(Level::Debug, 
                               "[WiFi] Попытка переподключения %d из %d", 
                               reconnectAttempts, MAX_RECONNECT_ATTEMPTS);
                     
                     // После достижения максимального числа попыток запускаем портал
                     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) 
                     {
-                        logger->log(farm::log::Level::Warning, 
-                                  "[WiFi] Не удалось переподключиться после %d попыток, запуск портала конфигурации", 
+                        logger->log(Level::Warning, 
+                                  "[WiFi] Не удалось переподключиться после %d попыток, запуск Config Portal", 
                                   reconnectAttempts);
                         
                         // Запускаем портал конфигурации
@@ -160,15 +238,13 @@ namespace farm::net
                     }
                     else 
                     {
-                        // Простая попытка переподключения к последней сети
-                        logger->log(farm::log::Level::Info, "[WiFi] Попытка переподключения");
                         WiFi.reconnect();
                     }
                 }
             }
             else if (reconnectAttempts > 0) {
                 // Если соединение восстановлено после попыток переподключения
-                logger->log(farm::log::Level::Info, 
+                logger->log(Level::Info, 
                           "[WiFi] Переподключено к %s (IP: %s, RSSI: %d дБм)", 
                           WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
                 reconnectAttempts = 0;
@@ -180,7 +256,7 @@ namespace farm::net
     void MyWiFiManager::setDebugOutput(bool enable)
     {
         wifiManager.setDebugOutput(enable);
-        logger->log(farm::log::Level::Debug, 
+        logger->log(Level::Debug, 
                   "[WiFi] Отладочный вывод %s", 
                   enable ? "включен" : "отключен");
     }
@@ -189,7 +265,7 @@ namespace farm::net
     void MyWiFiManager::setDebugOutput(bool enable, const String& prefix)
     {
         wifiManager.setDebugOutput(enable, prefix);
-        logger->log(farm::log::Level::Debug, 
+        logger->log(Level::Debug, 
                   "[WiFi] Отладочный вывод %s с префиксом: %s",
                   enable ? "включен" : "отключен", prefix.c_str());
     }
@@ -215,9 +291,9 @@ namespace farm::net
     // Установка имени и пароля точки доступа
     void MyWiFiManager::setAccessPointCredentials(const String& name, const String& password)
     {
-        apName = name;
+        apName     = name;
         apPassword = password;
-        logger->log(farm::log::Level::Debug, 
+        logger->log(Level::Debug, 
                   "[WiFi] Установлены учетные данные точки доступа: %s (пароль: %s)", 
                      apName.c_str(), apPassword.c_str());
     }
@@ -229,7 +305,7 @@ namespace farm::net
         if (name.length() > 0)
         {
             WiFi.setHostname(name.c_str());
-            logger->log(farm::log::Level::Debug, 
+            logger->log(Level::Debug, 
                       "[WiFi] Установлено имя хоста: %s", name.c_str());
         }
     }
@@ -237,14 +313,12 @@ namespace farm::net
     // Сброс всех настроек WiFi
     bool MyWiFiManager::resetSettings()
     {   
-        logger->log(farm::log::Level::Warning, "[WiFi] Удаление сохраненных учетных данных");
+        logger->log(Level::Warning, "[WiFi] Удаление сохраненных учетных данных");
         
         // Вызываем метод базового класса для сброса настроек
         wifiManager.resetSettings();
         
-        logger->log(farm::log::Level::Info, "[WiFi] Настройки сети удалены");
-        
-        return true; // Возвращаем успешность операции
+        return true; 
     }
         
     // Проверка наличия сохраненных настроек WiFi
@@ -256,7 +330,7 @@ namespace farm::net
         
         if (isSaved) 
         {
-            logger->log(farm::log::Level::Info, 
+            logger->log(Level::Info, 
                       "[WiFi] Найдены сохраненные учетные данные");
             
             // На этом этапе WiFi.SSID() еще недоступен, WiFiManager покажет SSID позже
@@ -264,7 +338,7 @@ namespace farm::net
         }
         else
         {
-            logger->log(farm::log::Level::Info, 
+            logger->log(Level::Info, 
                       "[WiFi] Сохраненные сети не найдены");
         }
         

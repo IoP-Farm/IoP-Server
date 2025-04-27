@@ -3,6 +3,7 @@
 #include <WiFiManager.h>
 #include "utils/logger_factory.h"
 #include "config/constants.h"
+#include <memory>
 
 namespace farm::net
 {
@@ -13,6 +14,12 @@ namespace farm::net
     class MyWiFiManager
     {
     private:
+        // Приватный конструктор (паттерн Синглтон)
+        explicit MyWiFiManager(std::shared_ptr<farm::log::ILogger> logger = nullptr);
+        
+        // Статический экземпляр как shared_ptr
+        static std::shared_ptr<MyWiFiManager> instance;
+        
         // Экземпляр WiFiManager от tzapu
         WiFiManager wifiManager;
         
@@ -35,10 +42,24 @@ namespace farm::net
         String apName     = DEFAULT_AP_NAME;
         String apPassword = DEFAULT_AP_PASSWORD;
         String hostName   = DEFAULT_HOSTNAME;
+        
+        // Параметры для MQTT в портале конфигурации
+        WiFiManagerParameter mqttServerParam;
+        WiFiManagerParameter mqttPortParam;
+        
+        // Колбэк для сохранения параметров
+        void saveParamsCallback();
 
     public:
-        // Конструктор
-        explicit MyWiFiManager(std::shared_ptr<farm::log::ILogger> logger = nullptr);
+        // Получение экземпляра синглтона как shared_ptr
+        static std::shared_ptr<MyWiFiManager> getInstance(std::shared_ptr<farm::log::ILogger> logger = nullptr);
+        
+        // Запрещаем копирование и присваивание
+        MyWiFiManager(const MyWiFiManager&) = delete;
+        MyWiFiManager& operator=(const MyWiFiManager&) = delete;
+        
+        // Деструктор
+        ~MyWiFiManager();
         
         // Установка имени и пароля точки доступа
         void setAccessPointCredentials(const String& name, const String& password = DEFAULT_AP_PASSWORD);

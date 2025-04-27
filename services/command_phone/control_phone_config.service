@@ -1,0 +1,11 @@
+[Unit]
+Description=Phone Config Service
+After=network.target
+
+[Service]
+ExecStart=/home/tovarichkek/services/command_phone/COMMAND
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

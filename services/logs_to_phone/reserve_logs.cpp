@@ -14,18 +14,6 @@ namespace asio = boost::asio;
 using boost::asio::ip::tcp;
 using json = nlohmann::json;
 
-#pragma pack(push, 1)
-struct SensorData {
-    int64_t timestamp_unix;
-    double temperature_DHT22;
-    double temperature_DS18B20;
-    double humidity;
-    double water_level;
-    double soil_moisture;
-    double light_intensity;
-};
-#pragma pack(pop)
-
 const std::string DB_PATH = "/home/tovarichkek/services/data_server_farm/data.db";
 const int TCP_PORT = 1488;
 const std::string LOG_FILE = "/var/log/data_to_phone.log";
@@ -44,8 +32,8 @@ public:
         sqlite3_close(db);
     }
 
-    std::vector<SensorData> get_data(int64_t unix_from, int64_t unix_to) {
-        std::vector<SensorData> results;
+    json get_data(int64_t unix_from, int64_t unix_to) {
+        json result = json::array();
         
         sqlite3_stmt* stmt;
         const char* sql = "SELECT "
@@ -61,20 +49,20 @@ public:
             sqlite3_bind_int64(stmt, 2, unix_to);
 
             while(sqlite3_step(stmt) == SQLITE_ROW) {
-                SensorData data;
-                data.timestamp_unix = sqlite3_column_int64(stmt, 0);
-                data.temperature_DHT22 = sqlite3_column_double(stmt, 1);
-                data.temperature_DS18B20 = sqlite3_column_double(stmt, 2);
-                data.humidity = sqlite3_column_double(stmt, 3);
-                data.water_level = sqlite3_column_double(stmt, 4);
-                data.soil_moisture = sqlite3_column_double(stmt, 5);
-                data.light_intensity = sqlite3_column_double(stmt, 6);
+                json record;
+                record["timestamp"] = sqlite3_column_int64(stmt, 0);
+                record["temperature_DHT22"] = sqlite3_column_double(stmt, 1);
+                record["temperature_DS18B20"] = sqlite3_column_double(stmt, 2);
+                record["humidity"] = sqlite3_column_double(stmt, 3);
+                record["water_level"] = sqlite3_column_double(stmt, 4);
+                record["soil_moisture"] = sqlite3_column_double(stmt, 5);
+                record["light_intensity"] = sqlite3_column_double(stmt, 6);
                 
-                results.push_back(data);
+                result.push_back(record);
             }
             sqlite3_finalize(stmt);
         }
-        return results;
+        return result;
     }
 };
 
@@ -104,17 +92,17 @@ public:
     }
 };
 
-void send_binary_data(tcp::socket& socket, const std::vector<SensorData>& data) {
-    // Отправляем количество записей
-    uint32_t count = htonl(data.size());
-    asio::write(socket, asio::buffer(&count, sizeof(count)));
-
-    // Отправляем сами данные
-    if(!data.empty()) {
-        const char* buffer = reinterpret_cast<const char*>(data.data());
-        size_t bytes = data.size() * sizeof(SensorData);
-        asio::write(socket, asio::buffer(buffer, bytes));
-    }
+void send_json_data(tcp::socket& socket, const json& data) {
+    // Создаем итоговый JSON с количеством записей
+    json response;
+    response["count"] = data.size();
+    response["data"] = data;
+    
+    // Конвертируем в строку
+    std::string response_str = response.dump() + "\n";
+    
+    // Отправляем данные
+    asio::write(socket, asio::buffer(response_str));
 }
 
 void handle_client(tcp::socket socket, Database& db, Logger& logger) {
@@ -141,7 +129,7 @@ void handle_client(tcp::socket socket, Database& db, Logger& logger) {
         }
 
         auto data = db.get_data(unix_from, unix_to);
-        send_binary_data(socket, data);
+        send_json_data(socket, data);
         
         logger.log(client_ip, unix_from, unix_to, data.size());
         std::cout << "Sent " << data.size() 

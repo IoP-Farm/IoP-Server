@@ -2,16 +2,14 @@
 #include <sqlite3.h>
 #include <mqtt/async_client.h>
 #include <nlohmann/json.hpp>
-#include <thread>
 #include <chrono>
-
+#include <thread>
 
 using namespace std;
 using json = nlohmann::json;
 
-// Конфигурация
 const string MQTT_BROKER = "tcp://localhost:1883";
-const string MQTT_TOPIC = "/data";
+const string MQTT_TOPIC = "/farm001/data";
 const string DB_FILE = "/home/tovarichkek/services/data_server_farm/data.db";
 
 class MQTTListener : public virtual mqtt::callback {
@@ -21,8 +19,13 @@ class MQTTListener : public virtual mqtt::callback {
         const char* sql = 
             "CREATE TABLE IF NOT EXISTS sensor_data ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,"
-            "data TEXT);";
+            "timestamp_unix INTEGER,"
+            "temperature_DHT22 REAL,"
+            "temperature_DS18B20 REAL,"
+            "humidity REAL,"
+            "water_level REAL,"
+            "soil_moisture REAL,"
+            "light_intensity REAL);";
             
         if (sqlite3_exec(db, sql, nullptr, nullptr, nullptr) != SQLITE_OK) {
             throw runtime_error(sqlite3_errmsg(db));
@@ -45,21 +48,39 @@ public:
         try {
             auto j = json::parse(msg->get_payload());
             
-            sqlite3_stmt* stmt;
-            const char* sql = "INSERT INTO sensor_data (data) VALUES (?);";
+            // Получаем текущее время в Unix time
+            auto now = chrono::system_clock::now();
+            auto timestamp = chrono::duration_cast<chrono::seconds>(
+                now.time_since_epoch()).count();
             
-            if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
-                string data = msg->get_payload();
-                sqlite3_bind_text(stmt, 1, data.c_str(), -1, SQLITE_STATIC);
-                
-                if (sqlite3_step(stmt) != SQLITE_DONE) {
-                    cerr << "Insert error: " << sqlite3_errmsg(db) << endl;
-                }
-                sqlite3_finalize(stmt);
+            sqlite3_stmt* stmt;
+            const char* sql = "INSERT INTO sensor_data (timestamp_unix, "
+                "temperature_DHT22, temperature_DS18B20, humidity, "
+                "water_level, soil_moisture, light_intensity) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?);";
+            
+            if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+                cerr << "Prepare error: " << sqlite3_errmsg(db) << endl;
+                return;
             }
+            
+            // Привязываем параметры
+            sqlite3_bind_int64(stmt, 1, timestamp);
+            sqlite3_bind_double(stmt, 2, j["temperature_DHT22"].get<double>());
+            sqlite3_bind_double(stmt, 3, j["temperature_DS18B20"].get<double>());
+            sqlite3_bind_double(stmt, 4, j["humidity"].get<double>());
+            sqlite3_bind_double(stmt, 5, j["water_level"].get<double>());
+            sqlite3_bind_double(stmt, 6, j["soil_moisture"].get<double>());
+            sqlite3_bind_double(stmt, 7, j["light_intensity"].get<double>());
+            
+            if (sqlite3_step(stmt) != SQLITE_DONE) {
+                cerr << "Insert error: " << sqlite3_errmsg(db) << endl;
+            }
+            
+            sqlite3_finalize(stmt);
         }
         catch (const exception& e) {
-            cerr << "Error: " << e.what() << endl;
+            cerr << "Error processing message: " << e.what() << endl;
         }
     }
 };
@@ -75,10 +96,6 @@ int main() {
         
         cout << "Service started. Press Enter to exit..." << endl;
         cin.get();
-
-        while(true){    
-		std::this_thread::sleep_for(std::chrono::seconds(20));
-	}; //Что я делаю
 
         client.unsubscribe(MQTT_TOPIC)->wait();
         client.disconnect()->wait();

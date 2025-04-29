@@ -48,7 +48,7 @@ class MqttSender {
     mqtt::async_client client;
     
 public:
-    MqttSender() : client(MQTT_BROKER, "phone_gateway") {
+    MqttSender() : client(MQTT_BROKER, "command_phone_gateway") {
         client.connect()->wait();
     }
 

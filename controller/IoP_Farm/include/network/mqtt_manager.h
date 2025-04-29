@@ -55,11 +55,13 @@ namespace farm::net
         void onMqttPublish(uint16_t packetId);
         
         // Настройка MQTT клиента
-        void setupMQTTClient();
+        bool setupMQTTClient();
         
         // Обработка полученной команды
         void handleCommand(const farm::config::CommandCode& command);
-        
+
+        // Имя устройства, буффер для setClientId (необходим для решения проблемы с const char* и c_str()!)
+        char deviceIdBuffer[farm::config::mqtt::DEVICE_ID_MAX_LENGTH];
     public:
         // Получение экземпляра синглтона как shared_ptr
         static std::shared_ptr<MQTTManager> getInstance(std::shared_ptr<farm::log::ILogger> logger = nullptr);

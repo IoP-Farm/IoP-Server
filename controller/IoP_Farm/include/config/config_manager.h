@@ -17,15 +17,6 @@
 
 namespace farm::config
 {
-    // Типы конфигурационных файлов
-    enum class ConfigType
-    {
-        Data,           // Данные от сенсоров ({device_id}/data)
-        System,         // Конфигурация системы ({device_id}/config)
-        Command,        // Команды управления ({device_id}/command)
-        Mqtt            // Конфигурация MQTT (не отправляется в топики! Нужно для сохранения в памяти)
-    };
-
     // Менеджер конфигурации - синглтон с использованием std::shared_ptr
     class ConfigManager
     {
@@ -55,7 +46,8 @@ namespace farm::config
 
         JsonDocument& getConfigDocument(ConfigType type);
         const JsonDocument& getConfigDocument(ConfigType type) const;
-        
+
+        // 
     public:
         // Получение экземпляра синглтона как shared_ptr
         static std::shared_ptr<ConfigManager> getInstance(std::shared_ptr<farm::log::ILogger> logger = nullptr);
@@ -110,9 +102,6 @@ namespace farm::config
         {
             auto& doc = getConfigDocument(type);
             doc[key] = value;
-            
-            logger->log(farm::log::Level::Debug, 
-                      "[Config] Установлено значение для ключа '%s'", key);
         }
         
         // Проверка существования ключа
@@ -126,5 +115,8 @@ namespace farm::config
         
         // Обновление конфигурации из JSON строки
         bool updateFromJson(ConfigType type, const String& jsonString);
+
+        // Вывод информации о файловой системе SPIFFS через Serial
+        void printSpiffsInfo() const;
     };
 }

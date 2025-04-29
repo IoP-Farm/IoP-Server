@@ -3,6 +3,7 @@
 #include "network/mqtt_manager.h"
 #include "config/config_manager.h"
 #include "utils/logger_factory.h"
+#include "sensors/sensors_manager.h"
 
 #ifdef IOP_DEBUG
 #include "unit/test_config_manager.h"
@@ -11,6 +12,8 @@
 using namespace farm::config;
 using namespace farm::log;
 using namespace farm::net;
+using namespace farm::sensors;
+using namespace farm::config::sensors::timing;
 
 // Создаем логгер
 #ifdef IOP_DEBUG
@@ -23,6 +26,7 @@ auto logger = LoggerFactory::createSerialLogger(Level::Info);
 std::shared_ptr<ConfigManager> configManager = ConfigManager::getInstance(logger);
 std::shared_ptr<MyWiFiManager> wifiManager   = MyWiFiManager::getInstance(logger);
 std::shared_ptr<MQTTManager>   mqttManager   = MQTTManager::getInstance(logger);
+std::shared_ptr<SensorsManager> sensorsManager = SensorsManager::getInstance(logger);
 
 void setup() 
 {
@@ -31,26 +35,24 @@ void setup()
     delay(1000);
 
     configManager->initialize(); // Инициализация ConfigManager
+
+    logger->log(Level::Debug, "Текущая файловая система SPIFFS:");
+    configManager->printSpiffsInfo();
+
     wifiManager  ->initialize(); // Инициализация WiFiManager
     mqttManager  ->initialize(); // Инициализация MQTTManager
+    sensorsManager->initialize(); // Инициализация SensorsManager
+    
+    // Устанавливаем интервал считывания датчиков
+    sensorsManager->setReadInterval(DEFAULT_READ_INTERVAL);
 }
 
 void loop() 
 {
     wifiManager->maintainConnection();
     mqttManager->maintainConnection();
+    sensorsManager->loop(); // Обслуживание датчиков
 
-    // Каждые 20 секунд отправляем сообщение в MQTT
-    if (mqttManager->isClientConnected()) 
-    {
-        static unsigned long lastMqttPublish = 0;
-        if (millis() - lastMqttPublish >= 20000) 
-        {
-            lastMqttPublish = millis();
-            mqttManager->publishData();
-        }
-    }
-
-    // Выполнение других задач проекта
+    // Оставляем небольшую задержку для других задач
     delay(100);
 }

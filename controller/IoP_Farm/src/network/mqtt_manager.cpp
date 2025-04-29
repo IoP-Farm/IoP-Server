@@ -70,7 +70,8 @@ namespace farm::net
         
         // Настройка MQTT клиента
         setupMQTTClient();
-        
+
+
         // Устанавливаем флаг успешной инициализации
         isInitialized = true;
 
@@ -78,7 +79,7 @@ namespace farm::net
     }
     
     // Настройка MQTT клиента и колбэков
-    void MQTTManager::setupMQTTClient()
+    bool MQTTManager::setupMQTTClient()
     {
         // Получаем настройки MQTT из конфигурации
         String host     = configManager->getValue<String>(ConfigType::Mqtt,  "host");
@@ -88,6 +89,14 @@ namespace farm::net
         // Сохраняем информацию о сервере
         serverDomain = host;
         serverPort   = port;
+
+        if (host.length() == 0 || port < 0 || deviceId.length() == 0)
+        {
+            logger->log(Level::Error, 
+                      "[MQTT] Некорректные настройки MQTT: Host=%s, Port=%d, DeviceId=%s", 
+                      host.c_str(), port, deviceId.c_str());
+            return false;
+        }
         
         logger->log(Level::Debug, 
                   "[MQTT] Настраиваем MQTT: Server=%s, Port=%d, DeviceId=%s", 
@@ -99,7 +108,7 @@ namespace farm::net
         {
             // Если удалось преобразовать строку в IP-адрес
             logger->log(Level::Debug, 
-                      "[MQTT] Подключение к серверу по IP");
+                      "[MQTT] Подключение к серверу будет производиться по IP");
             
             // Установка IP-адреса и порта
             mqttClient.setServer(serverIP, serverPort);
@@ -108,13 +117,25 @@ namespace farm::net
         {
             // Если это доменное имя или неверный формат IP
             logger->log(Level::Warning, 
-                      "[MQTT] Подключение к серверу по имени хоста");
+                      "[MQTT] Подключение к серверу будет производиться по имени хоста");
             
             // Установка параметров сервера по строке хоста
             mqttClient.setServer(serverDomain.c_str(), serverPort);
         }
         
-        mqttClient.setClientId(deviceId.c_str());
+        // Установка clientId
+        if (deviceId.length() > 0)  
+        {
+            strncpy(deviceIdBuffer, deviceId.c_str(), deviceId.length());  
+            deviceIdBuffer[deviceId.length()] = '\0';
+            mqttClient.setClientId(deviceIdBuffer);
+            logger->log(Level::Debug, "[MQTT] Установлен clientId: %s", deviceIdBuffer);
+        }
+        else
+        {
+            logger->log(Level::Error, "[MQTT] Нет deviceId при настройке MQTT");
+            return false;
+        }
         
         // Настройка колбэков
         mqttClient.onConnect([this](bool sessionPresent) {
@@ -144,6 +165,8 @@ namespace farm::net
         });
 
         logger->log(Level::Debug, "[MQTT] MQTT Callbacks настроены");
+
+        return true;
     }
     
     // Проверка, настроен ли MQTT
@@ -438,7 +461,6 @@ namespace farm::net
     }
     
     // Поддержание MQTT соединения
-    // TODO: разобраться с проблемой подключения после трех попыток
     void MQTTManager::maintainConnection()
     {
         // Периодическая проверка MQTT соединения
@@ -470,6 +492,7 @@ namespace farm::net
                     logger->log(Level::Info, "[MQTT] Попытка подключения к %s:%d", serverDomain.c_str(), serverPort);
                     
                     isConnecting = true;
+                    
                     mqttClient.connect();
                 }
             }

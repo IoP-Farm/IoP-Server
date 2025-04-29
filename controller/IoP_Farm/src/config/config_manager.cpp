@@ -1,10 +1,7 @@
 #include "config/config_manager.h"
 
-// TODO: сейчас команда для начальной загрузки файлов конфигурации в память: pio run --target uploadfs
-
 /*
     Для загрузки файлов в SPIFFS: pio run --target uploadfs
-    Для скачивания содержимого SPIFFS можно использовать: pio run --target downloadfs
 */
 
 namespace farm::config
@@ -410,13 +407,13 @@ namespace farm::config
         // TODO: сделать по-человечески
         if (output.length() <= farm::log::constants::LOG_BUFFER_SIZE - 58)
         {
-            logger->log(Level::Info, 
+            logger->log(Level::Debug, 
                       "[Config] Текущий файл %s:\n%s", 
                       getConfigPath(type), output.c_str());
         }
         else 
         {
-            if (logger->getLevel() >= Level::Info)
+            if (logger->getLevel() >= Level::Debug)
             {
                 logger->log(Level::Warning, 
                         "[Config] %s слишком большой для вывода в лог", 
@@ -515,5 +512,77 @@ namespace farm::config
                   getConfigPath(type));
         
         return true;
+    }
+
+    // Вывод информации о файловой системе SPIFFS через Serial
+    void ConfigManager::printSpiffsInfo() const
+    {
+        Serial.println("\n===== Анализ файловой системы SPIFFS =====");
+        
+        // Проверка, что SPIFFS смонтирована
+        if (!SPIFFS.begin(true))
+        {
+            Serial.println("Ошибка при монтировании SPIFFS!");
+            return;
+        }
+        
+        // Информация о файловой системе
+        Serial.println("\n--- Информация о файловой системе ---");
+        Serial.print("Общий размер: ");
+        Serial.print(SPIFFS.totalBytes() / 1024);
+        Serial.println(" КБ");
+        
+        Serial.print("Использовано: ");
+        Serial.print(SPIFFS.usedBytes() / 1024);
+        Serial.println(" КБ");
+        
+        Serial.print("Свободно: ");
+        Serial.print((SPIFFS.totalBytes() - SPIFFS.usedBytes()) / 1024);
+        Serial.println(" КБ");
+        
+        // Вывод всех файлов
+        Serial.println("\n--- Список файлов ---");
+        File root = SPIFFS.open("/");
+        File file = root.openNextFile();
+        int fileCount = 0;
+        
+        while (file)
+        {
+            fileCount++;
+            Serial.println("\n--- Файл #" + String(fileCount) + " ---");
+            Serial.print("Имя: ");
+            Serial.println(file.name());
+            
+            Serial.print("Размер: ");
+            Serial.print(file.size());
+            Serial.println(" байт");
+            
+            Serial.println("Содержимое:");
+            Serial.println("--------------------------------------");
+            
+            // Чтение и вывод содержимого файла
+            while (file.available())
+            {
+                String line = file.readStringUntil('\n');
+                Serial.println(line);
+            }
+            
+            Serial.println("--------------------------------------");
+            
+            // Переход к следующему файлу
+            file = root.openNextFile();
+        }
+        
+        if (fileCount == 0)
+        {
+            Serial.println("Файлы не найдены!");
+        }
+        else
+        {
+            Serial.print("\nВсего файлов: ");
+            Serial.println(fileCount);
+        }
+        
+        Serial.println("\n===== Анализ файловой системы завершен =====");
     }
 }

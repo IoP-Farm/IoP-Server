@@ -56,7 +56,7 @@ namespace farm::config
     // Инициализация SPIFFS
     bool ConfigManager::initialize()
     {
-        logger->log(Level::Info, "[Config] Инициализация SPIFFS");
+        logger->log(Level::Farm, "[Config] Инициализация SPIFFS");
         
         if (!SPIFFS.begin(true)) {
             logger->log(Level::Error, "[Config] Ошибка инициализации SPIFFS");

@@ -26,6 +26,7 @@ namespace farm::log
             case Level::Error:   return constants::ERROR_PREFIX;
             case Level::Warning: return constants::WARN_PREFIX;
             case Level::Info:    return constants::INFO_PREFIX;
+            case Level::Farm:    return constants::FARM_PREFIX;
             case Level::Debug:   return constants::DEBUG_PREFIX;
             case Level::Test:    return constants::TEST_PREFIX;
             default:             return "";
@@ -47,6 +48,7 @@ namespace farm::log
             case Level::Error:   return constants::COLOR_RED;
             case Level::Warning: return constants::COLOR_YELLOW;
             case Level::Info:    return constants::COLOR_WHITE;
+            case Level::Farm:    return constants::COLOR_GREEN;
             case Level::Debug:   return constants::COLOR_BLUE;
             case Level::Test:    return constants::COLOR_MAGENTA;
             default:             return constants::COLOR_WHITE;
@@ -89,22 +91,67 @@ namespace farm::log
             return;
         }
         
-        // Объединяем логи в одно сообщение с разделителями
-        String combinedLog;
-        for (const auto& log : logBuffer) 
-        {
-            combinedLog += log + "\n";
-        }
-        
         // Получаем топик для логов
         String logTopic = "/" + String(mqtt::DEFAULT_DEVICE_ID) + String(mqtt::LOG_SUFFIX);
         
-        // Отправляем через MQTT с QoS = 1 и retain = true
-        mqttManager->publishToTopicLoggerVersion(logTopic, combinedLog);
-        
-        // Очищаем буфер и обновляем время
-        logBuffer.clear();
-        lastSendTime = millis();
+        // Если количество сообщений меньше или равно MAX_PACKET_SIZE, отправляем все сразу
+        if (logBuffer.size() <= constants::MAX_PACKET_SIZE)
+        {
+            // Объединяем логи в одно сообщение с разделителями
+            String combinedLog;
+            for (const auto& log : logBuffer) 
+            {
+                combinedLog += log + "\n";
+            }
+            
+            // Отправляем через MQTT
+            mqttManager->publishToTopicLoggerVersion(logTopic, combinedLog, mqtt::QOS_1, true);
+            
+            // Очищаем буфер после отправки
+            logBuffer.clear();
+            lastSendTime = millis();
+        }
+        // Если сообщений больше MAX_PACKET_SIZE, отправляем пакетами
+        else
+        {
+            // Количество полных пакетов
+            size_t numPackets = logBuffer.size() / constants::MAX_PACKET_SIZE;
+            
+            // Отправляем полные пакеты
+            for (size_t i = 0; i < numPackets; i++)
+            {
+                String packetLog;
+                size_t startIdx = i * constants::MAX_PACKET_SIZE;
+                size_t endIdx = (i + 1) * constants::MAX_PACKET_SIZE;
+                
+                // Формируем пакет из MAX_PACKET_SIZE сообщений
+                for (size_t j = startIdx; j < endIdx; j++)
+                {
+                    packetLog += logBuffer[j] + "\n";
+                }
+                
+                // Отправляем через MQTT
+                mqttManager->publishToTopicLoggerVersion(logTopic, packetLog, mqtt::QOS_1, true);
+            }
+            
+            // Отправляем оставшиеся сообщения (если есть)
+            size_t remainingStart = numPackets * constants::MAX_PACKET_SIZE;
+            if (remainingStart < logBuffer.size())
+            {
+                String remainingLog;
+                for (size_t i = remainingStart; i < logBuffer.size(); i++)
+                {
+                    remainingLog += logBuffer[i] + "\n";
+                }
+                
+                // Отправляем через MQTT
+                mqttManager->publishToTopicLoggerVersion(logTopic, remainingLog, mqtt::QOS_1, true);
+            }
+            
+            // Очищаем буфер после отправки
+            logBuffer.clear();
+            lastSendTime = millis();
+        }
     }
     
     void MQTTLogTransport::processLogs()
@@ -118,12 +165,13 @@ namespace farm::log
             return;
         }
         
-        // Проверяем, не пора ли отправить логи
+        // Проверяем, прошло ли достаточно времени с момента последней отправки
         unsigned long currentTime = millis();
         if (!logBuffer.empty() && 
             (currentTime - lastSendTime >= constants::MQTT_LOG_SEND_INTERVAL) && 
             mqttManager->isClientConnected()) 
         {
+            // Отправляем накопленные логи
             flushLogs();
         }
     }

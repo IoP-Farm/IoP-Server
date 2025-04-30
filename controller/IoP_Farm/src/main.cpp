@@ -13,6 +13,18 @@ using namespace farm::net;
 using namespace farm::sensors;
 using namespace farm::config::sensors::timing;
 
+/*
+Горит светодиодом при:
+- Нет подключения к WiFi
+- Нет подключения к MQTT
+*/
+
+/*
+Мигает светодиодом при:
+- Публикации данных в MQTT
+- Получении сообщений от MQTT
+*/
+
 // Создаем логгер
 #if defined(IOP_DEBUG) && defined(COLOR_SERIAL_LOG)
 auto logger = LoggerFactory::createColorSerialMQTTLogger(Level::Debug);
@@ -37,6 +49,8 @@ void setup()
     // Инициализация Serial
     Serial.begin(115200);
     delay(1000);
+
+    pinMode(pins::LED_PIN, OUTPUT);
 
     configManager->initialize(); // Инициализация ConfigManager
 

@@ -75,7 +75,7 @@ namespace farm::sensors
         // Если время нулевое, значит измерение не удалось
         if (duration == 0)
         {
-            logger->log(Level::Warning, 
+            logger->log(Level::Error, 
                       "[HCSR04] Не удалось получить сигнал от датчика");
             return calibration::SENSOR_ERROR_VALUE;
         }
@@ -87,7 +87,7 @@ namespace farm::sensors
         // Проверяем корректность измерения
         if (distanceCm < 2.0f || distanceCm > 400.0f)
         {
-            logger->log(Level::Warning, 
+            logger->log(Level::Error, 
                       "[HCSR04] Измеренное расстояние вне допустимого диапазона: %.2f см", 
                       distanceCm);
             return calibration::SENSOR_ERROR_VALUE;

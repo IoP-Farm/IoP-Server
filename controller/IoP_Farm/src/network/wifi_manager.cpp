@@ -6,6 +6,7 @@ namespace farm::net
 {
     // Используем константы WiFi и сокращаем пространства имен
     using namespace farm::config::wifi;
+    using namespace farm::config::sensors;
     using farm::log::Level;
     using farm::log::LoggerFactory;
     using farm::config::ConfigType;
@@ -38,6 +39,7 @@ namespace farm::net
         // Обратный вызов при активации точки доступа
         wifiManager.setAPCallback([this](WiFiManager* wm) {
             portalActive = true;
+            digitalWrite(pins::LED_PIN, HIGH);
             this->logger->log(Level::Info, 
                      "[WiFi] Config Portal активирован: %s (Pass: %s)", 
                      apName.c_str(), apPassword.c_str());
@@ -103,6 +105,8 @@ namespace farm::net
     // Инициализация WiFi и попытка подключения
     bool MyWiFiManager::initialize()
     {
+        logger->log(Level::Farm, "[WiFi] Инициализация WIFI");
+        
         // Настройка точки доступа и имени хоста
         setAccessPointCredentials(DEFAULT_AP_NAME, DEFAULT_AP_PASSWORD);
         setHostName(DEFAULT_HOSTNAME);
@@ -116,8 +120,6 @@ namespace farm::net
 #elif defined(IOP_DEBUG)
         setDebugOutput(true, String("[DEBUG] [WM]   "));
 #endif
-
-        logger->log(Level::Info, "[WiFi] Инициализация");
         
         // Устанавливаем имя хоста, если оно было задано
         if (hostName.length() > 0) 
@@ -138,8 +140,9 @@ namespace farm::net
             mqttPortParam.setValue(String(currentPort).c_str(), MQTT_PORT_PARAM_LENGTH);
         }
         
+        
         // Попытка автоматического подключения
-        logger->log(Level::Debug, "[WiFi] Запуск автоподключения с таймаутом %d сек", CONNECT_TIMEOUT);
+        logger->log(Level::Info, "[WiFi] Запуск автоподключения к сети, таймаут: %d с", CONNECT_TIMEOUT);
         bool connected = wifiManager.autoConnect(
             apName.c_str(), 
             apPassword.length() > 0 ? apPassword.c_str() : nullptr
@@ -149,7 +152,8 @@ namespace farm::net
         {
             // Если подключение успешно, значит настройки были сохранены или введены
             // в процессе работы портала конфигурации
-            logger->log(Level::Info, 
+            digitalWrite(pins::LED_PIN, LOW);
+            logger->log(Level::Farm, 
                       "[WiFi] Подключено к %s (IP: %s, RSSI: %d дБм)", 
                       WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
             
@@ -163,7 +167,7 @@ namespace farm::net
         else
         {
             logger->log(Level::Warning, 
-                      "[WiFi] Не удалось установить соединение через автоподключение");
+                      "[WiFi] Не удалось установить соединение при инициализации");
         }
         
         return connected;
@@ -181,19 +185,21 @@ namespace farm::net
             // Если подключение установлено через портал
             if (WiFi.status() == WL_CONNECTED) 
             {
-                logger->log(Level::Info, 
+                logger->log(Level::Farm, 
                           "[WiFi] Соединение установлено через Config Portal");
-                logger->log(Level::Info, 
+                logger->log(Level::Farm, 
                           "[WiFi] Сеть: %s, IP: %s", 
                           WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
                 
                 // Закрываем портал только если он действительно активен
                 if (isConfigPortalActive())
                 {
+                    digitalWrite(pins::LED_PIN, LOW);
                     logger->log(Level::Debug, "[WiFi] Остановка Config Portal");
                     wifiManager.stopConfigPortal();
                 }
                 
+                digitalWrite(pins::LED_PIN, LOW);
                 // Сбрасываем флаги и счетчики
                 portalActive      = false;
                 reconnectAttempts = 0;
@@ -221,7 +227,7 @@ namespace farm::net
                     lastReconnectTime = currentMillis;
                     reconnectAttempts++;
                     
-                    logger->log(Level::Debug, 
+                    logger->log(Level::Info, 
                               "[WiFi] Попытка переподключения %d из %d", 
                               reconnectAttempts, MAX_RECONNECT_ATTEMPTS);
                     
@@ -234,6 +240,7 @@ namespace farm::net
                         
                         // Запускаем портал конфигурации
                         portalActive = true;
+                        digitalWrite(pins::LED_PIN, HIGH);
                         wifiManager.startConfigPortal(
                             apName.c_str(), 
                             apPassword.length() > 0 ? apPassword.c_str() : nullptr
@@ -250,7 +257,7 @@ namespace farm::net
             }
             else if (reconnectAttempts > 0) {
                 // Если соединение восстановлено после попыток переподключения
-                logger->log(Level::Info, 
+                logger->log(Level::Farm, 
                           "[WiFi] Переподключено к %s (IP: %s, RSSI: %d дБм)", 
                           WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
                 reconnectAttempts = 0;
@@ -299,7 +306,7 @@ namespace farm::net
     {
         apName     = name;
         apPassword = password;
-        logger->log(Level::Debug, 
+        logger->log(Level::Farm, 
                   "[WiFi] Установлены учетные данные точки доступа: %s (пароль: %s)", 
                      apName.c_str(), apPassword.c_str());
     }

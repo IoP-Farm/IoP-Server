@@ -42,7 +42,7 @@ namespace farm::config
         constexpr const char* CONFIG_SUFFIX  = "/config";      // Суффикс для топика конфигурации
         constexpr const char* COMMAND_SUFFIX = "/command";    // Суффикс для топика команд
         constexpr const char* LOG_SUFFIX     = "/log";         // Суффикс для топика логов
-        
+
         // Константы для работы с MQTT подключением
         constexpr unsigned long CHECK_INTERVAL = 5000;           // 5 секунд между проверками соединения
         constexpr uint8_t MAX_RECONNECT_ATTEMPTS = 1;           // Максимальное количество попыток переподключения
@@ -90,13 +90,14 @@ namespace farm::config
         // Пины для датчиков
         namespace pins
         {
-            constexpr int8_t DHT22_PIN           = -1;  // Пин DHT22 (темп. и влажность) ex: 4
-            constexpr int8_t DS18B20_PIN         = -1;  // Пин DS18B20 (темп. воды) ex: 13
-            constexpr int8_t HC_SR04_TRIG_PIN    = -1;  // Пин HC-SR04 Trig ex: 5
-            constexpr int8_t HC_SR04_ECHO_PIN    = -1;  // Пин HC-SR04 Echo ex: 18
+            constexpr int8_t DHT22_PIN           = 4;  // Пин DHT22 (темп. и влажность) ex: 4
+            constexpr int8_t DS18B20_PIN         = 13;  // Пин DS18B20 (темп. воды) ex: 13
+            constexpr int8_t HC_SR04_TRIG_PIN    = 5;  // Пин HC-SR04 Trig ex: 5
+            constexpr int8_t HC_SR04_ECHO_PIN    = 18;  // Пин HC-SR04 Echo ex: 18
             constexpr int8_t FC28_PIN            = 36;  // Пин FC-28 (влажность почвы) ex: 36
             constexpr int8_t KY018_PIN           = 39;  // Пин KY-018 (освещённость) ex: 39
-            constexpr int8_t YFS401_PIN          = -1;  // Пин YF-S401 (расходомер) ex: 22
+            constexpr int8_t YFS401_PIN          = 22;  // Пин YF-S401 (расходомер) ex: 22
+            constexpr int8_t LED_PIN             = 2;   // Пин светодиода ex: 2
         }
 
         // Имена датчиков
@@ -201,6 +202,7 @@ namespace farm::log // это не конфиг, чисто для логгер�
         None,
         Error,
         Warning,
+        Farm,       // Добавляем новый уровень для важной информации о работе фермы
         Info,
         Debug,
         Test
@@ -215,6 +217,7 @@ namespace farm::log // это не конфиг, чисто для логгер�
         constexpr const char* INFO_PREFIX  = "[INFO]  ";
         constexpr const char* DEBUG_PREFIX = "[DEBUG] ";
         constexpr const char* TEST_PREFIX  = "[TEST]  ";
+        constexpr const char* FARM_PREFIX  = "[FARM]  ";
         
         // ANSI цветовые коды
         constexpr const char* COLOR_RESET   = "\033[0m";
@@ -229,9 +232,10 @@ namespace farm::log // это не конфиг, чисто для логгер�
         constexpr const char* STYLE_BOLD    = "\033[1m";
         
         // Константы для MQTT логгера
-        constexpr unsigned long MQTT_LOG_SEND_INTERVAL = 10000;  // Интервал отправки логов по MQTT (10 секунд)
+        constexpr unsigned long MQTT_LOG_SEND_INTERVAL = 2000;  // Интервал отправки логов по MQTT (миллисекунды)
         constexpr const char* MQTT_LOG_TOPIC_SUFFIX = "/log";   // Суффикс топика для отправки логов
         constexpr farm::log::Level MQTT_LOG_MIN_LEVEL = farm::log::Level::Debug; // Минимальный уровень для отправки в MQTT
-        constexpr size_t MAX_BUFFER_SIZE = 50; // Максимальный размер буфера логов
+        constexpr size_t MAX_BUFFER_SIZE = 100; // Максимальный размер буфера логов
+        constexpr size_t MAX_PACKET_SIZE = 50; // Максимальное количество сообщений в одном пакете MQTT
     }
 } 

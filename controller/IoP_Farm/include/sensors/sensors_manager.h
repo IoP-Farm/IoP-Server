@@ -128,7 +128,7 @@ namespace farm::sensors
         } 
         else 
         {
-            logger->log(farm::log::Level::Warning, "[Sensors] Не удалось инициализировать датчик %s (%s)", 
+            logger->log(farm::log::Level::Error, "[Sensors] Не удалось инициализировать датчик %s (%s)", 
                       sensor->getSensorName(), sensor->getMeasurementType().c_str());
             return false;
         }

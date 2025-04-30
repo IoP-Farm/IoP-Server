@@ -8,7 +8,7 @@ namespace farm::net
     using farm::config::ConfigType;
     using farm::config::CommandCode;
     using farm::log::Level;
-    
+    using namespace farm::config::sensors;
     // Инициализация статического экземпляра
     std::shared_ptr<MQTTManager> MQTTManager::instance = nullptr;
     
@@ -55,7 +55,7 @@ namespace farm::net
     // Инициализация MQTT и настройка колбэков
     bool MQTTManager::initialize()
     {
-        logger->log(Level::Info, "[MQTT] Инициализация MQTT");
+        logger->log(Level::Farm, "[MQTT] Инициализация MQTT");
         
         // Проверяем настройки MQTT
         if (!isMqttConfigured()) 
@@ -96,8 +96,8 @@ namespace farm::net
             return false;
         }
         
-        logger->log(Level::Debug, 
-                  "[MQTT] Настраиваем MQTT: Server=%s, Port=%d, DeviceId=%s", 
+        logger->log(Level::Info, 
+                  "[MQTT] Параметры MQTT: Server=%s, Port=%d, DeviceId=%s", 
                   serverDomain.c_str(), serverPort, deviceId.c_str());
         
         // Преобразуем строку IP-адреса в объект IPAddress
@@ -105,7 +105,7 @@ namespace farm::net
         if (serverIP.fromString(host)) 
         {
             // Если удалось преобразовать строку в IP-адрес
-            logger->log(Level::Debug, 
+            logger->log(Level::Info, 
                       "[MQTT] Подключение к серверу будет производиться по IP");
             
             // Установка IP-адреса и порта
@@ -114,7 +114,7 @@ namespace farm::net
         else 
         {
             // Если это доменное имя или неверный формат IP
-            logger->log(Level::Warning, 
+            logger->log(Level::Info, 
                       "[MQTT] Подключение к серверу будет производиться по имени хоста");
             
             // Установка параметров сервера по строке хоста
@@ -211,8 +211,9 @@ namespace farm::net
         isConnected      = true;
         isConnecting     = false;
         reconnectAttempts = 0;
-        
-        logger->log(Level::Info, 
+
+        digitalWrite(pins::LED_PIN, LOW);
+        logger->log(Level::Farm, 
                   "[MQTT] Успешное подключение к серверу %s:%d", 
                   serverDomain.c_str(), 
                   serverPort);
@@ -225,6 +226,8 @@ namespace farm::net
     {
         isConnected  = false;
         isConnecting = false;
+
+        digitalWrite(pins::LED_PIN, HIGH);
         
         const char* reasonStr;
         switch (reason) {
@@ -278,6 +281,8 @@ namespace farm::net
                                  AsyncMqttClientMessageProperties properties,
                                  size_t len, size_t index, size_t total)
     {
+        digitalWrite(pins::LED_PIN, HIGH);
+
         // Создаем временный буфер для сообщения (добавляем нулевой символ в конец)
         char* message = new char[len + 1];
         memcpy(message, payload, len);
@@ -341,11 +346,16 @@ namespace farm::net
         
         // Освобождаем память
         delete[] message;
+
+        digitalWrite(pins::LED_PIN, LOW);
     }
     
     // Обработчик успешной публикации
     void MQTTManager::onMqttPublish(uint16_t packetId)
     {
+        digitalWrite(pins::LED_PIN, HIGH);
+        delay(10);
+        digitalWrite(pins::LED_PIN, LOW);
     }
     
     // Подписка на конкретный топик
@@ -369,7 +379,7 @@ namespace farm::net
         }
         else 
         {
-            logger->log(Level::Error, 
+            logger->log(Level::Error,
                       "[MQTT] Ошибка при подписке на топик '%s'", 
                       topic.c_str());
         }
@@ -521,7 +531,7 @@ namespace farm::net
         
         if (packetId > 0)
         {
-            logger->log(Level::Info, 
+            logger->log(Level::Farm, 
                       "[MQTT] Данные #%d опубликованы в топик '%s'", 
                       packetId, dataTopic.c_str());
         }

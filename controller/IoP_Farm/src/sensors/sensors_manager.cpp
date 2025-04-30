@@ -64,7 +64,7 @@ namespace farm::sensors
     // Инициализация всех датчиков
     bool SensorsManager::initialize()
     {
-        logger->log(Level::Info, "[Sensors] Инициализация датчиков");
+        logger->log(Level::Farm, "[Sensors] Инициализация датчиков");
         
         // Очищаем существующие датчики
         clearSensors();
@@ -145,7 +145,7 @@ namespace farm::sensors
             totalChecked++;
         }
         
-        logger->log(Level::Info, 
+        logger->log(Level::Farm, 
                   "[Sensors] Количество инициализированных датчиков: %d/%d", 
                   sensors.size(), totalChecked);
         
@@ -171,7 +171,7 @@ namespace farm::sensors
             // Считываем показания
             if (sensor->read() != calibration::SENSOR_ERROR_VALUE) 
             {
-                logger->log(Level::Debug, 
+                logger->log(Level::Info, 
                           "[Sensors] [%s] %s = %.2f %s", 
                           name.c_str(), 
                           sensor->getMeasurementType().c_str(), 
@@ -181,7 +181,7 @@ namespace farm::sensors
             } 
             else 
             {
-                logger->log(Level::Warning, 
+                logger->log(Level::Error, 
                           "[Sensors] Ошибка считывания данных с датчика %s (%s)", 
                           name.c_str(), 
                           sensor->getMeasurementType().c_str());
@@ -189,7 +189,7 @@ namespace farm::sensors
             }
         }
         
-        logger->log(Level::Info, 
+        logger->log(Level::Farm, 
                   "[Sensors] Успешно считано: %d/%d", 
                   successCount, totalReadable);
         
@@ -218,7 +218,7 @@ namespace farm::sensors
             } 
             else 
             {
-                logger->log(Level::Warning, 
+                logger->log(Level::Error, 
                           "[Sensors] Ошибка сохранения данных с датчика %s (%s)", 
                           name.c_str(), 
                           sensor->getMeasurementType().c_str());
@@ -226,7 +226,7 @@ namespace farm::sensors
             }
         }
         
-        logger->log(Level::Info, 
+        logger->log(Level::Farm, 
                   "[Sensors] Успешно сохранено: %d/%d", 
                   successCount, totalSaveable);
         
@@ -242,7 +242,7 @@ namespace farm::sensors
         {
             lastReadTime = currentTime;
             
-            logger->log(Level::Info, "[Sensors] Запуск цикла считывания данных");
+            logger->log(Level::Farm, "[Sensors] Запуск цикла считывания данных");
             
             // Считываем данные со всех датчиков
             readAllSensors();
@@ -349,8 +349,8 @@ namespace farm::sensors
     void SensorsManager::setReadInterval(unsigned long interval)
     {
         readInterval = interval;
-        logger->log(Level::Debug, 
-                  "[Sensors] Установлен интервал считывания: %lu мс", 
+        logger->log(Level::Info, 
+                  "[Sensors] Установлен интервал считывания датчиков: %lu мс", 
                   interval);
     }
 

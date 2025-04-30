@@ -89,7 +89,7 @@ namespace farm::sensors
         // Проверяем корректность считанного значения
         if (isnan(humidity)) 
         {
-            logger->log(Level::Warning, 
+            logger->log(Level::Error, 
                       "[DHT22_Humidity] Не удалось считать данные с датчика");
             lastMeasurement = calibration::SENSOR_ERROR_VALUE;
             return calibration::SENSOR_ERROR_VALUE;

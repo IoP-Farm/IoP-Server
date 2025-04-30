@@ -169,9 +169,7 @@ namespace farm::sensors
             totalReadable++;
             
             // Считываем показания
-            bool readSuccess = sensor->read() != calibration::SENSOR_ERROR_VALUE;
-            
-            if (readSuccess) 
+            if (sensor->read() != calibration::SENSOR_ERROR_VALUE) 
             {
                 logger->log(Level::Debug, 
                           "[Sensors] [%s] %s = %.2f %s", 
@@ -213,11 +211,8 @@ namespace farm::sensors
             }
             
             totalSaveable++;
-            
-            // Сохраняем значение
-            bool saveSuccess = sensor->saveMeasurement();
-            
-            if (saveSuccess) 
+
+            if (sensor->saveMeasurement()) 
             {
                 successCount++;
             } 
@@ -263,14 +258,11 @@ namespace farm::sensors
             {
                 bool published = mqttManager->publishData();
                 
-                if (published) 
-                {
-                    logger->log(Level::Info, "[Sensors] Данные успешно опубликованы в MQTT");
-                } 
-                else 
+                if (!published) 
                 {
                     logger->log(Level::Error, "[Sensors] Ошибка публикации данных в MQTT");
                 }
+                
                 return true; // Продолжаем работу, даже если не удалось опубликовать данные
             }
             else

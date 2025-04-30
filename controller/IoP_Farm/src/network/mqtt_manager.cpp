@@ -27,8 +27,6 @@ namespace farm::net
         
         // Получаем экземпляр ConfigManager
         configManager = farm::config::ConfigManager::getInstance(this->logger);
-        
-        logger->log(Level::Info, "[MQTT] Инициализация MQTT");
     }
     
     // Получение экземпляра синглтона
@@ -196,6 +194,9 @@ namespace farm::net
                 
             case ConfigType::Command:
                 return "/" + deviceId + COMMAND_SUFFIX;
+
+            case ConfigType::Log:
+                return "/" + deviceId + LOG_SUFFIX;
                 
             default:
                 logger->log(Level::Error, 
@@ -700,24 +701,6 @@ namespace farm::net
         
         return saved;
     }
-
-    // Получение текущего хоста MQTT
-    String MQTTManager::getMqttHost() const
-    {
-        return serverDomain;
-    }
-    
-    // Получение текущего порта MQTT
-    uint16_t MQTTManager::getMqttPort() const
-    {
-        return serverPort;
-    }
-    
-    // Получение текущего deviceId MQTT
-    String MQTTManager::getMqttDeviceId() const
-    {
-        return configManager->getValue<String>(ConfigType::Mqtt, "deviceId");
-    }
     
     // Применение всех настроек MQTT одновременно
     bool MQTTManager::applyMqttSettings(const String& host, uint16_t port, const String& deviceId)
@@ -758,4 +741,77 @@ namespace farm::net
         
         return success;
     }
+
+    bool MQTTManager::isMqttInitialized() const
+    {
+        return isInitialized;
+    }
+
+    // Получение текущих настроек MQTT
+    const String& MQTTManager::getMqttHost() const 
+    { 
+        return serverDomain; 
+    }
+
+    int16_t MQTTManager::getMqttPort() const 
+    { 
+        return serverPort; 
+    }
+
+    String MQTTManager::getDeviceId() const 
+    {
+        return configManager->getValue<String>(ConfigType::Mqtt, "deviceId"); 
+    }
+
+    // Публикация в произвольный топик
+    bool MQTTManager::publishToTopic(const String& topic, const String& payload, uint8_t qos, bool retain)
+    {
+        // Проверяем подключение
+        if (!isClientConnected()) 
+        {
+            logger->log(Level::Warning, 
+                      "[MQTT] Невозможно опубликовать данные: клиент не подключен");
+            return false;
+        }
+        
+        // Отправляем данные
+        uint16_t packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
+        
+        // Проверяем результат
+        if (packetId > 0) 
+        {
+            logger->log(Level::Debug, 
+                      "[MQTT] Данные #%d опубликованы в топик '%s'", 
+                      packetId, topic.c_str());
+            return true;
+        } 
+        else 
+        {
+            logger->log(Level::Error, 
+                      "[MQTT] Ошибка публикации данных в топик %s", 
+                      topic.c_str());
+            return false;
+        }
+    }
+
+    bool farm::net::MQTTManager::publishToTopicLoggerVersion(const String &topic, const String &payload, uint8_t qos, bool retain)
+    {
+        // Уже проверил подключение
+
+        // Отправляем данные
+        uint16_t packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
+        
+        // Проверяем результат
+        if (packetId > 0) 
+        {
+            return true; // Никакого логгирования!! Потому что вызывает логгер
+        } 
+        else 
+        {
+            return false;
+        }
+    }
 }
+
+
+

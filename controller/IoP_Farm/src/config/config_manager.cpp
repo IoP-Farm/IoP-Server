@@ -29,8 +29,6 @@ namespace farm::config
         {
             this->logger = logger;
         }
-        
-        this->logger->log(Level::Info, "[Config] Инициализация ConfigManager");
     }
 
     // Получение экземпляра синглтона
@@ -514,10 +512,11 @@ namespace farm::config
         return true;
     }
 
-    // Вывод информации о файловой системе SPIFFS через Serial
+    // Вывод информации о файловой системе SPIFFS через Serial; только для дебага
     void ConfigManager::printSpiffsInfo() const
     {
-        Serial.println("\n===== Анализ файловой системы SPIFFS =====");
+        #ifdef IOP_DEBUG
+        Serial.println("Анализ файловой системы SPIFFS");
         
         // Проверка, что SPIFFS смонтирована
         if (!SPIFFS.begin(true))
@@ -584,5 +583,6 @@ namespace farm::config
         }
         
         Serial.println("\n===== Анализ файловой системы завершен =====");
+        #endif
     }
 }

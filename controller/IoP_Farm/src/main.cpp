@@ -4,10 +4,8 @@
 #include "config/config_manager.h"
 #include "utils/logger_factory.h"
 #include "sensors/sensors_manager.h"
-
-#ifdef IOP_DEBUG
-#include "unit/test_config_manager.h"
-#endif
+#include "utils/logger.h"
+#include "memory"
 
 using namespace farm::config;
 using namespace farm::log;
@@ -16,17 +14,23 @@ using namespace farm::sensors;
 using namespace farm::config::sensors::timing;
 
 // Создаем логгер
-#ifdef IOP_DEBUG
-auto logger = LoggerFactory::createSerialLogger(Level::Debug);
+#if defined(IOP_DEBUG) && defined(COLOR_SERIAL_LOG)
+auto logger = LoggerFactory::createColorSerialMQTTLogger(Level::Debug);
+#elif defined(IOP_DEBUG)
+auto logger = LoggerFactory::createSerialMQTTLogger(Level::Debug);
+#elif defined(COLOR_SERIAL_LOG)
+auto logger = LoggerFactory::createColorSerialMQTTLogger(Level::Info);
 #else
-auto logger = LoggerFactory::createSerialLogger(Level::Info);
+auto logger = LoggerFactory::createSerialMQTTLogger(Level::Info);
 #endif
 
+
 // Получаем экземпляры синглтонов
-std::shared_ptr<ConfigManager> configManager = ConfigManager::getInstance(logger);
-std::shared_ptr<MyWiFiManager> wifiManager   = MyWiFiManager::getInstance(logger);
-std::shared_ptr<MQTTManager>   mqttManager   = MQTTManager::getInstance(logger);
+std::shared_ptr<ConfigManager>  configManager = ConfigManager::getInstance(logger);
+std::shared_ptr<MyWiFiManager>  wifiManager   = MyWiFiManager::getInstance(logger);
+std::shared_ptr<MQTTManager>    mqttManager   = MQTTManager::getInstance(logger);
 std::shared_ptr<SensorsManager> sensorsManager = SensorsManager::getInstance(logger);
+
 
 void setup() 
 {
@@ -37,10 +41,12 @@ void setup()
     configManager->initialize(); // Инициализация ConfigManager
 
     logger->log(Level::Debug, "Текущая файловая система SPIFFS:");
+    #ifdef IOP_DEBUG
     configManager->printSpiffsInfo();
+    #endif
 
-    wifiManager  ->initialize(); // Инициализация WiFiManager
-    mqttManager  ->initialize(); // Инициализация MQTTManager
+    wifiManager   ->initialize(); // Инициализация WiFiManager
+    mqttManager   ->initialize(); // Инициализация MQTTManager
     sensorsManager->initialize(); // Инициализация SensorsManager
     
     // Устанавливаем интервал считывания датчиков

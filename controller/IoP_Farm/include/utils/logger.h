@@ -3,31 +3,10 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "config/constants.h"
 
 namespace farm::log
 {
-    // Константы для логгера
-    namespace constants
-    {
-        constexpr size_t LOG_BUFFER_SIZE   = 256;  // Размер буфера для форматирования сообщений
-        constexpr const char* ERROR_PREFIX = "[ERROR] ";
-        constexpr const char* WARN_PREFIX  = "[WARN]  ";
-        constexpr const char* INFO_PREFIX  = "[INFO]  ";
-        constexpr const char* DEBUG_PREFIX = "[DEBUG] ";
-        constexpr const char* TEST_PREFIX  = "[TEST]  ";
-    }
-
-    // Уровни логирования
-    enum class Level
-    {
-        None,
-        Error,
-        Warning,
-        Info,
-        Debug,
-        Test
-    };
-
     // Транспорт для вывода сообщений
     class ILogTransport
     {
@@ -43,6 +22,25 @@ namespace farm::log
         void write(Level level, const String& message) override;
     };
 
+    // Транспорт для MQTT
+    class MQTTLogTransport : public ILogTransport
+    {
+    private:
+        std::vector<String> logBuffer;
+        unsigned long lastSendTime;
+
+    public:
+        MQTTLogTransport();
+        
+        void write(Level level, const String& message) override;
+        
+        // Принудительная отправка логов
+        void flushLogs();
+        
+        // Периодическая проверка и отправка логов (вызывать в loop)
+        void processLogs();
+    };
+
     // Форматтер для сообщений
     class IMessageFormatter
     {
@@ -56,9 +54,15 @@ namespace farm::log
     {
     public:
         String format(Level level, const char* message) const override;
-        
-    private:
-        const char* getLevelPrefix(Level level) const;
+        static const char* getLevelPrefix(Level level);
+    };
+    
+    // Цветной форматтер с ANSI-цветами
+    class ColorFormatter : public StandardFormatter
+    {
+    public:
+        String format(Level level, const char* message) const override;
+        static const char* getLevelColor(Level level);
     };
 
     // Интерфейс логгера

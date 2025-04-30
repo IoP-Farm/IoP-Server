@@ -9,6 +9,7 @@ namespace farm::net
     using farm::log::Level;
     using farm::log::LoggerFactory;
     using farm::config::ConfigType;
+    using farm::log::ColorFormatter;
     
     // Инициализация статического экземпляра
     std::shared_ptr<MyWiFiManager> MyWiFiManager::instance = nullptr;
@@ -107,8 +108,13 @@ namespace farm::net
         setHostName(DEFAULT_HOSTNAME);
 
         // Включение встроенной отладки WiFiManager
-#ifdef IOP_DEBUG
-        setDebugOutput(true, "[DEBUG] [WM]   ");
+        // не пишем RESET, потому что при выводе наших сообщений он уже обновляется
+#if defined(IOP_DEBUG) && defined(COLOR_SERIAL_LOG)
+        setDebugOutput(true, 
+        String(ColorFormatter::getLevelColor(Level::Debug)) + 
+        String("[DEBUG] [WM]   ")); 
+#elif defined(IOP_DEBUG)
+        setDebugOutput(true, String("[DEBUG] [WM]   "));
 #endif
 
         logger->log(Level::Info, "[WiFi] Инициализация");

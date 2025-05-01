@@ -283,10 +283,15 @@ namespace farm::net
                   enable ? "включен" : "отключен", prefix.c_str());
     }
 
-    // Получение прямого доступа к WiFiManager для продвинутой настройки
-    WiFiManager* MyWiFiManager::getWiFiManager()
+    // Получение IP-адреса
+    String MyWiFiManager::getIPAddress() const
     {
-        return &wifiManager;
+        if (isConnected())
+        {
+            return WiFi.localIP().toString();
+        }
+        logger->log(Level::Warning, "[WiFi] Попытка получения IP-адреса при отсутствии соединения");
+        return "";
     }
     
     // Проверка наличия соединения

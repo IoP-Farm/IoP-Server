@@ -73,6 +73,24 @@ namespace farm::net
         // Устанавливаем флаг успешной инициализации
         isInitialized = true;
 
+        static bool tryFirst = true;
+
+        if (tryFirst) 
+        {
+            tryFirst = false;
+
+            if (!isClientConnected() && WiFi.isConnected() && isMqttConfigured() && !isConnecting)
+            {
+                lastReconnectTime = millis();
+                
+                logger->log(Level::Info, "[MQTT] Первичная попытка подключения к %s:%d", serverDomain.c_str(), serverPort);
+                
+                isConnecting = true;
+                
+                mqttClient.connect();
+            }
+        }
+
         return true;
     }
     
@@ -822,6 +840,3 @@ namespace farm::net
         }
     }
 }
-
-
-

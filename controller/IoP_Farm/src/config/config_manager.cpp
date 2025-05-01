@@ -18,7 +18,8 @@ namespace farm::config
         : dataConfig(),     // В ArduinoJson 7 не нужно указывать размер
           systemConfig(),   // В ArduinoJson 7 не нужно указывать размер
           commandConfig(),  // В ArduinoJson 7 не нужно указывать размер
-          mqttConfig()      // Конфигурация MQTT
+          mqttConfig(),     // Конфигурация MQTT
+          passwordsConfig() // Конфигурация паролей
     {
         // Если логгер не передан, создаем новый с помощью фабрики
         if (!logger) 
@@ -51,6 +52,7 @@ namespace farm::config
         systemConfig.clear();
         commandConfig.clear();
         mqttConfig.clear();
+        passwordsConfig.clear();
     }
 
     // Инициализация SPIFFS
@@ -95,6 +97,13 @@ namespace farm::config
             allFilesExist = false;
         }
 
+        if (!SPIFFS.exists(paths::DEFAULT_PASSWORDS_CONFIG)) {
+        logger->log(Level::Error, 
+                    "[Config] Отсутствует файл: %s", 
+                    paths::DEFAULT_PASSWORDS_CONFIG);
+        allFilesExist = false;
+        }
+
         if (!allFilesExist) {
             logger->log(Level::Error, 
                        "[Config] Отсутствуют необходимые файлы. "
@@ -131,6 +140,7 @@ namespace farm::config
         success &= clearConfig(ConfigType::System);
         success &= clearConfig(ConfigType::Command);
         success &= clearConfig(ConfigType::Mqtt);
+        success &= clearConfig(ConfigType::Passwords);
 
         return success;
     }
@@ -150,6 +160,7 @@ namespace farm::config
         success &= deleteConfig(ConfigType::System);
         success &= deleteConfig(ConfigType::Command);
         success &= deleteConfig(ConfigType::Mqtt);
+        success &= deleteConfig(ConfigType::Passwords);
 
         return success;
     }
@@ -205,41 +216,57 @@ namespace farm::config
         return true;
     }
 
-    // Получение пути к файлу конфигурации
+    // Получение пути к файлу конфигурации в зависимости от типа
     const char* ConfigManager::getConfigPath(ConfigType type) const
     {
-        switch (type) {
+        switch (type)
+        {
             case ConfigType::Data:
                 return paths::DATA_CONFIG;
+            
             case ConfigType::System:
                 return paths::SYSTEM_CONFIG;
+            
             case ConfigType::Command:
                 return paths::COMMAND_CONFIG;
+            
             case ConfigType::Mqtt:
                 return paths::MQTT_CONFIG;
+
+            case ConfigType::Passwords:
+                return paths::PASSWORDS_CONFIG;
+            
             default:
-                logger->log(Level::Error, 
-                          "[Config] Неизвестный тип настроек");
-                return "";
+                logger->log(farm::log::Level::Error, 
+                          "[Config] Запрошен путь для неизвестного типа конфигурации");
+                return nullptr;
         }
     }
     
-    // Получение пути к дефолтному файлу конфигурации
+    // Получение пути к файлу дефолтной конфигурации в зависимости от типа
     const char* ConfigManager::getDefaultConfigPath(ConfigType type) const
     {
-        switch (type) {
+        switch (type)
+        {
             case ConfigType::Data:
                 return paths::DEFAULT_DATA_CONFIG;
+            
             case ConfigType::System:
                 return paths::DEFAULT_SYSTEM_CONFIG;
+            
             case ConfigType::Command:
                 return paths::DEFAULT_COMMAND_CONFIG;
+            
             case ConfigType::Mqtt:
                 return paths::DEFAULT_MQTT_CONFIG;
+
+            case ConfigType::Passwords:
+                return paths::DEFAULT_PASSWORDS_CONFIG;
+            
             default:
-                logger->log(Level::Error, 
-                          "[Config] Неизвестный тип стандартных настроек");
-                return "";
+                logger->log(farm::log::Level::Error, 
+                          "[Config] Запрошен путь для неизвестного типа дефолтной конфигурации");
+                return nullptr;
         }
     }
 
@@ -247,19 +274,27 @@ namespace farm::config
     // TODO: возвращаемое значение по дефолту нехорошее, но не критично, т.к. всегда передаем валидный тип
     JsonDocument& ConfigManager::getConfigDocument(ConfigType type)
     {
-        switch (type) {
+        switch (type)
+        {
             case ConfigType::Data:
                 return dataConfig;
+            
             case ConfigType::System:
                 return systemConfig;
+            
             case ConfigType::Command:
                 return commandConfig;
+            
             case ConfigType::Mqtt:
                 return mqttConfig;
+
+            case ConfigType::Passwords:
+                return passwordsConfig;
+            
             default:
-                logger->log(Level::Error, 
-                          "[Config] Неизвестный тип настроек");
-                return dataConfig; // Возвращаем dataConfig как значение по умолчанию
+                logger->log(farm::log::Level::Error, 
+                          "[Config] Запрошен документ для неизвестного типа конфигурации");
+                return dataConfig; // Возвращаем документ по умолчанию
         }
     }
 
@@ -267,19 +302,27 @@ namespace farm::config
     // TODO: возвращаемое значение по дефолту нехорошее, но не критично, т.к. всегда передаем валидный тип
     const JsonDocument& ConfigManager::getConfigDocument(ConfigType type) const
     {
-        switch (type) {
+        switch (type)
+        {
             case ConfigType::Data:
                 return dataConfig;
+            
             case ConfigType::System:
                 return systemConfig;
+            
             case ConfigType::Command:
                 return commandConfig;
+            
             case ConfigType::Mqtt:
                 return mqttConfig;
+
+            case ConfigType::Passwords:
+                return passwordsConfig;
+            
             default:
-                logger->log(Level::Error, 
-                          "[Config] Неизвестный тип настроек");
-                return dataConfig; // Возвращаем dataConfig как значение по умолчанию
+                logger->log(farm::log::Level::Error, 
+                          "[Config] Запрошен документ для неизвестного типа конфигурации");
+                return dataConfig; // Возвращаем документ по умолчанию
         }
     }
     
@@ -300,8 +343,7 @@ namespace farm::config
         
         if (loadJsonFromFile(defaultPath, doc)) {
             // После загрузки дефолтной конфигурации, сохраняем её в основной файл
-            const char* configPath = getConfigPath(type);
-            return saveJsonToFile(configPath, doc);
+            return saveJsonToFile(getConfigPath(type), doc);
         }
         
         return false;
@@ -315,6 +357,7 @@ namespace farm::config
         success &= loadDefaultConfig(ConfigType::System);
         success &= loadDefaultConfig(ConfigType::Command);
         success &= loadDefaultConfig(ConfigType::Mqtt);
+        success &= loadDefaultConfig(ConfigType::Passwords);
 
         return success;
     }
@@ -356,6 +399,7 @@ namespace farm::config
         success &= loadConfig(ConfigType::System);
         success &= loadConfig(ConfigType::Command);
         success &= loadConfig(ConfigType::Mqtt);
+        success &= loadConfig(ConfigType::Passwords);
         
         return success;
     }
@@ -369,6 +413,7 @@ namespace farm::config
         success &= saveConfig(ConfigType::System);
         success &= saveConfig(ConfigType::Command);
         success &= saveConfig(ConfigType::Mqtt);
+        success &= saveConfig(ConfigType::Passwords);
         
         logger->log(Level::Info, 
                   "[Config] Сохранение всех настроек %s", 

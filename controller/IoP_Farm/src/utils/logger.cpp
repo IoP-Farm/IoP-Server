@@ -167,8 +167,9 @@ namespace farm::log
         
         // Проверяем, прошло ли достаточно времени с момента последней отправки
         unsigned long currentTime = millis();
-        if (!logBuffer.empty() && 
-            (currentTime - lastSendTime >= constants::MQTT_LOG_SEND_INTERVAL) && 
+        if ((!logBuffer.empty() && 
+            (currentTime - lastSendTime >= constants::MQTT_LOG_SEND_INTERVAL) ||
+            (logBuffer.size() >= constants::MAX_BUFFER_SIZE)) && 
             mqttManager->isClientConnected()) 
         {
             // Отправляем накопленные логи

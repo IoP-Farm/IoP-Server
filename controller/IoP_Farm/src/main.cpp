@@ -1,29 +1,24 @@
 #include <Arduino.h>
+#include <memory>
+
+#include "sensors/sensors_manager.h"
+
 #include "network/wifi_manager.h"
 #include "network/mqtt_manager.h"
+
 #include "config/config_manager.h"
+#include "config/constants.h"
+
 #include "utils/logger_factory.h"
-#include "sensors/sensors_manager.h"
 #include "utils/logger.h"
-#include "memory"
+#include "utils/ota_manager.h"
+#include "utils/web_server_manager.h"
 
 using namespace farm::config;
+using namespace farm::config::sensors;
 using namespace farm::log;
 using namespace farm::net;
 using namespace farm::sensors;
-using namespace farm::config::sensors::timing;
-
-/*
-Горит светодиодом при:
-- Нет подключения к WiFi
-- Нет подключения к MQTT
-*/
-
-/*
-Мигает светодиодом при:
-- Публикации данных в MQTT
-- Получении сообщений от MQTT
-*/
 
 // Создаем логгер
 #if defined(IOP_DEBUG) && defined(COLOR_SERIAL_LOG)
@@ -38,10 +33,12 @@ auto logger = LoggerFactory::createSerialMQTTLogger(Level::Info);
 
 
 // Получаем экземпляры синглтонов
-std::shared_ptr<ConfigManager>  configManager = ConfigManager::getInstance(logger);
-std::shared_ptr<MyWiFiManager>  wifiManager   = MyWiFiManager::getInstance(logger);
-std::shared_ptr<MQTTManager>    mqttManager   = MQTTManager::getInstance(logger);
-std::shared_ptr<SensorsManager> sensorsManager = SensorsManager::getInstance(logger);
+std::shared_ptr<ConfigManager>    configManager    = ConfigManager::getInstance(logger);
+std::shared_ptr<MyWiFiManager>    wifiManager      = MyWiFiManager::getInstance(logger);
+std::shared_ptr<MQTTManager>      mqttManager      = MQTTManager::getInstance(logger);
+std::shared_ptr<SensorsManager>   sensorsManager   = SensorsManager::getInstance(logger);
+std::shared_ptr<OTAManager>       otaManager       = OTAManager::getInstance(logger);
+std::shared_ptr<WebServerManager> webServerManager = WebServerManager::getInstance(logger);
 
 
 void setup() 
@@ -51,6 +48,7 @@ void setup()
     delay(1000);
 
     pinMode(pins::LED_PIN, OUTPUT);
+    digitalWrite(pins::LED_PIN, HIGH);
 
     configManager->initialize(); // Инициализация ConfigManager
 
@@ -59,19 +57,30 @@ void setup()
     configManager->printSpiffsInfo();
     #endif
 
-    wifiManager   ->initialize(); // Инициализация WiFiManager
-    mqttManager   ->initialize(); // Инициализация MQTTManager
-    sensorsManager->initialize(); // Инициализация SensorsManager
+    wifiManager     ->initialize(); // Инициализация WiFiManager
+    mqttManager     ->initialize(); // Инициализация MQTTManager
+    sensorsManager  ->initialize(); // Инициализация SensorsManager
+    otaManager      ->initialize(); // Инициализация OTAManager
+    
+    // Инициализация WebServerManager (с аутентификацией)
+    webServerManager->enableAuth(true);
+    webServerManager->initialize(); // Инициализация WebServerManager
     
     // Устанавливаем интервал считывания датчиков
-    sensorsManager->setReadInterval(DEFAULT_READ_INTERVAL);
+    sensorsManager->setReadInterval(timing::DEFAULT_READ_INTERVAL);
 }
 
 void loop() 
 {
     wifiManager->maintainConnection();
     mqttManager->maintainConnection();
-    sensorsManager->loop(); // Обслуживание датчиков
+
+    // Обслуживание датчиков    
+    sensorsManager->loop();
+
+    // Обработка OTA и веб-сервера
+    otaManager->handle(); 
+    webServerManager->handleClient();       
 
     // Оставляем небольшую задержку для других задач
     delay(100);

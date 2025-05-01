@@ -34,8 +34,8 @@ namespace farm::config
         JsonDocument dataConfig;     // Данные от датчиков
         JsonDocument systemConfig;   // Системная конфигурация
         JsonDocument commandConfig;  // Команды управления
-
         JsonDocument mqttConfig;     // Конфигурация MQTT
+        JsonDocument passwordsConfig; // Пароли и учетные данные
         
         // Методы для работы с конфигурацией
         bool loadJsonFromFile(const char* path, JsonDocument& doc);       // Из памяти в JSON документ

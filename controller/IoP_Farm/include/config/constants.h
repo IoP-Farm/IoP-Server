@@ -11,21 +11,25 @@ namespace farm::config
         System,         // Конфигурация системы ({device_id}/config)
         Command,        // Команды управления ({device_id}/command)
         Mqtt,           // Конфигурация MQTT (не отправляется в топики! Нужно для сохранения в памяти)
-        Log              // Логи (/{device_id}/log)
+        Log,            // Логи (/{device_id}/log). Это не файл. Нужно для получения MQTT топика
+        Passwords       // Пароли и учетные данные (не отправляются в топики! Локальное хранение)
     };
     
     // Пути к файлам конфигурации
     namespace paths
     {
-        constexpr const char* DATA_CONFIG    = "/data.json";     // Файл конфигурации с данными от датчиков
-        constexpr const char* SYSTEM_CONFIG  = "/config.json"; // Файл основной конфигурации системы
-        constexpr const char* COMMAND_CONFIG = "/cmd.json";   // Файл с командами управления
-        constexpr const char* MQTT_CONFIG    = "/mqtt.json"; // Файл конфигурации MQTT
+        constexpr const char* DATA_CONFIG      = "/data.json";     // Файл конфигурации с данными от датчиков
+        constexpr const char* SYSTEM_CONFIG    = "/config.json";   // Файл основной конфигурации системы
+        constexpr const char* COMMAND_CONFIG   = "/cmd.json";      // Файл с командами управления
+        constexpr const char* MQTT_CONFIG      = "/mqtt.json";     // Файл конфигурации MQTT
+        constexpr const char* PASSWORDS_CONFIG = "/passwords.json"; // Файл с паролями
+        
         // Пути к дефолтным файлам конфигурации
-        constexpr const char* DEFAULT_DATA_CONFIG    = "/default_data.json";     // Дефолтный файл с данными от датчиков
-        constexpr const char* DEFAULT_SYSTEM_CONFIG  = "/default_config.json"; // Дефолтный файл системной конфигурации
-        constexpr const char* DEFAULT_COMMAND_CONFIG = "/default_cmd.json";   // Дефолтный файл с командами управления
-        constexpr const char* DEFAULT_MQTT_CONFIG    = "/default_mqtt.json"; // Дефолтный файл конфигурации MQTT
+        constexpr const char* DEFAULT_DATA_CONFIG      = "/default_data.json";     // Дефолтный файл с данными от датчиков
+        constexpr const char* DEFAULT_SYSTEM_CONFIG    = "/default_config.json";   // Дефолтный файл системной конфигурации
+        constexpr const char* DEFAULT_COMMAND_CONFIG   = "/default_cmd.json";      // Дефолтный файл с командами управления
+        constexpr const char* DEFAULT_MQTT_CONFIG      = "/default_mqtt.json";     // Дефолтный файл конфигурации MQTT
+        constexpr const char* DEFAULT_PASSWORDS_CONFIG = "/default_passwords.json"; // Дефолтный файл с паролями
     }
 
     // Константы для MQTT
@@ -59,6 +63,7 @@ namespace farm::config
     {
         constexpr const char* DEFAULT_AP_NAME     = "IoP-Farm_001";   // Имя точки доступа по умолчанию
         constexpr const char* DEFAULT_AP_PASSWORD = "12345678"; // Пароль точки доступа по умолчанию
+        
         constexpr const char* DEFAULT_HOSTNAME    = "IoP-Farm_001";  // Имя хоста по умолчанию
         
         // Константы подключения
@@ -232,7 +237,7 @@ namespace farm::log // это не конфиг, чисто для логгер�
         constexpr const char* STYLE_BOLD    = "\033[1m";
         
         // Константы для MQTT логгера
-        constexpr unsigned long MQTT_LOG_SEND_INTERVAL = 2000;  // Интервал отправки логов по MQTT (миллисекунды)
+        constexpr unsigned long MQTT_LOG_SEND_INTERVAL = 1000;  // Интервал отправки логов по MQTT (миллисекунды)
         constexpr const char* MQTT_LOG_TOPIC_SUFFIX = "/log";   // Суффикс топика для отправки логов
         constexpr farm::log::Level MQTT_LOG_MIN_LEVEL = farm::log::Level::Debug; // Минимальный уровень для отправки в MQTT
         constexpr size_t MAX_BUFFER_SIZE = 100; // Максимальный размер буфера логов

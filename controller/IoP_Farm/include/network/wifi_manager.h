@@ -66,6 +66,9 @@ namespace farm::net
         
         // Установка имени хоста
         void setHostName(const String& name);
+
+        // Получение IP-адреса
+        String getIPAddress() const;
         
         // Проверка наличия сохраненных настроек WiFi
         bool checkWifiSaved();
@@ -78,9 +81,6 @@ namespace farm::net
         
         // Поддержание WiFi соединения - вызывать в цикле loop()
         void maintainConnection();
-        
-        // Получение прямого доступа к WiFiManager для продвинутой настройки
-        WiFiManager* getWiFiManager();
         
         // Проверка наличия соединения
         bool isConnected() const;

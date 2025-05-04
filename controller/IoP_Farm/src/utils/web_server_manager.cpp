@@ -27,7 +27,7 @@ namespace farm::net
         if (isInitialized)
         {
             server.stop();
-            logger->log(farm::log::Level::Info, "Веб-сервер остановлен");
+            logger->log(farm::log::Level::Info, "[WebServer] Веб-сервер остановлен");
         }
     }
     
@@ -84,7 +84,7 @@ namespace farm::net
         else 
         {
             // Используем значения по умолчанию
-            logger->log(farm::log::Level::Warning, "Не найдены учетные данные для веб-сервера в конфигурации");
+            logger->log(farm::log::Level::Warning, "[WebServer] Не найдены учетные данные для веб-сервера в конфигурации");
         }
         
         // Настройка обработчиков
@@ -264,7 +264,7 @@ namespace farm::net
         if (!server.authenticate(username.c_str(), password.c_str()))
         {   
             server.requestAuthentication();
-            logger->log(farm::log::Level::Warning, "Попытка доступа без авторизации");
+            logger->log(farm::log::Level::Warning, "[WebServer] Попытка доступа без авторизации");
             return false;
         }
         
@@ -276,7 +276,7 @@ namespace farm::net
     {
         username = user;
         password = pass;
-        logger->log(farm::log::Level::Info, "Установлены новые учетные данные для веб-сервера");
+        logger->log(farm::log::Level::Info, "[WebServer] Установлены новые учетные данные для веб-сервера");
         
         // Сохраняем в конфигурацию
         auto configManager = farm::config::ConfigManager::getInstance(logger);
@@ -289,7 +289,7 @@ namespace farm::net
     void WebServerManager::enableAuth(bool enable)
     {
         authEnabled = enable;
-        logger->log(farm::log::Level::Info, "Аутентификация для веб-сервера %s", 
+        logger->log(farm::log::Level::Info, "[WebServer] Аутентификация для веб-сервера %s", 
                   enable ? "включена" : "отключена");
     }
 

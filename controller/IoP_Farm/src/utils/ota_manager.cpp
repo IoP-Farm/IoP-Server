@@ -7,7 +7,7 @@ namespace farm::net
     
     // Конструктор
     OTAManager::OTAManager(std::shared_ptr<farm::log::ILogger> logger)
-        : logger(logger) 
+        : logger(logger), initialized(false), lastWifiState(false)
     {
         if (!logger) {
             this->logger = farm::log::LoggerFactory::createSerialLogger();
@@ -26,6 +26,14 @@ namespace farm::net
     // Инициализация OTA
     bool OTAManager::initialize()
     {
+        if (!WiFi.isConnected())
+        {
+            logger->log(farm::log::Level::Warning, "[ArduinoOTA] Невозможно инициализировать OTA: WiFi не подключен");
+            return false;
+        }
+        
+        lastWifiState = true;
+
         // Установка имени хоста из константы
         ArduinoOTA.setHostname(wifi::DEFAULT_HOSTNAME);
         
@@ -64,8 +72,9 @@ namespace farm::net
         ArduinoOTA.begin();
 
         setPassword(wifi::DEFAULT_AP_PASSWORD);
-        logger->log(farm::log::Level::Farm, "[ArduinoOTA] ArduinoOTA инициализирован");
+        logger->log(farm::log::Level::Farm, "[ArduinoOTA] ArduinoOTA настроен");
         
+        initialized = true;
         return true;
     }
     
@@ -84,6 +93,44 @@ namespace farm::net
     // Обработка OTA-запросов
     void OTAManager::handle()
     {
-        ArduinoOTA.handle();
+        // Получаем текущее состояние WiFi
+        bool currentWifiState = WiFi.isConnected();
+        
+        // Проверяем, произошло ли переподключение WiFi
+        if (currentWifiState && !lastWifiState) 
+        {   
+            // Если уже был инициализирован ранее, нужно сбросить флаг для реинициализации
+            if (initialized) 
+            {
+                initialized = false;
+            }
+            
+            initialize();
+        }
+        else if (!currentWifiState && initialized) 
+        {
+            // WiFi отключился, отмечаем OTA как не инициализированный
+            logger->log(farm::log::Level::Warning, "[ArduinoOTA] WiFi отключен, OTA недоступен");
+            lastWifiState = false;
+            initialized = false;
+        }
+        // Если OTA не инициализирован и WiFi подключен, инициализируем
+        else if (!initialized && currentWifiState)
+        {
+            logger->log(farm::log::Level::Info, "[ArduinoOTA] WiFi подключен, настройка OTA");
+            initialize();
+        }
+        
+        // Обрабатываем OTA запросы только если WiFi подключен
+        if (currentWifiState) 
+        {
+            ArduinoOTA.handle();
+        }
+    }
+    
+    // Проверка состояния инициализации
+    bool OTAManager::isInitialized() const
+    {
+        return initialized;
     }
 }

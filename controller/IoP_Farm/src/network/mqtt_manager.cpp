@@ -79,7 +79,12 @@ namespace farm::net
         {
             tryFirst = false;
 
-            if (!isClientConnected() && WiFi.isConnected() && isMqttConfigured() && !isConnecting)
+            if (!WiFi.isConnected())
+            {
+                logger->log(Level::Warning, "[MQTT] Нет подключения к WiFi для подключения к серверу");
+            }
+
+            if (!isClientConnected() && isMqttConfigured() && !isConnecting && WiFi.isConnected())
             {
                 lastReconnectTime = millis();
                 

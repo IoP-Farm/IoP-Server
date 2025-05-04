@@ -5,6 +5,16 @@
 #include <memory>
 #include "config/constants.h"
 
+// Определяем наличие FreeRTOS
+#if defined(CONFIG_FREERTOS_ENABLE) || defined(ESP_PLATFORM)
+#define USE_FREERTOS 1
+#endif
+
+#ifdef USE_FREERTOS
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#endif
+
 namespace farm::log
 {
     // Транспорт для вывода сообщений
@@ -28,9 +38,13 @@ namespace farm::log
     private:
         std::vector<String> logBuffer;
         unsigned long lastSendTime;
+#ifdef USE_FREERTOS
+        SemaphoreHandle_t logMutex;
+#endif
 
     public:
         MQTTLogTransport();
+        ~MQTTLogTransport();
         
         void write(Level level, const String& message) override;
         

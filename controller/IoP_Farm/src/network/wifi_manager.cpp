@@ -217,7 +217,7 @@ namespace farm::net
             // Проверка наличия соединения
             if (WiFi.status() != WL_CONNECTED) 
             {
-                // Первая потеря соединения или продолжающиеся попытки
+                // Первая потеря соединения
                 if (reconnectAttempts == 0) {
                     logger->log(Level::Warning, "[WiFi] Соединение потеряно");
                 }
@@ -311,7 +311,7 @@ namespace farm::net
     {
         apName     = name;
         apPassword = password;
-        logger->log(Level::Farm, 
+        logger->log(Level::Info, 
                   "[WiFi] Установлены учетные данные точки доступа: %s (пароль: %s)", 
                      apName.c_str(), apPassword.c_str());
     }

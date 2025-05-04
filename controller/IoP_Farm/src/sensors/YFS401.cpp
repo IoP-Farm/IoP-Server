@@ -58,6 +58,8 @@ namespace farm::sensors
             logger->log(farm::log::Level::Debug, 
                       "[YFS401] Прерывание отключено на пине %d", pin);
         }
+
+        enable(false);
         
         // Очищаем статический указатель
         if (s_instance == this)

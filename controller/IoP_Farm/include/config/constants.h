@@ -32,6 +32,27 @@ namespace farm::config
         constexpr const char* DEFAULT_PASSWORDS_CONFIG = "/default_passwords.json"; // Дефолтный файл с паролями
     }
 
+    // Константы для планировщика задач и FreeRTOS
+    namespace scheduler
+    {
+        // Приоритеты задач
+        constexpr uint8_t DEFAULT_TASK_PRIORITY = 2;    // Приоритет задачи по умолчанию
+        constexpr uint8_t SCHEDULER_TASK_PRIORITY = 1;  // Рекомендуемый приоритет задачи планировщика
+        
+        // Размеры стека задач
+        constexpr uint32_t DEFAULT_STACK_SIZE = 2048;   // Стандартный размер стека для простых задач
+        constexpr uint32_t SCHEDULER_STACK_SIZE = 4096; // Размер стека для задачи планировщика
+        
+        // Временные интервалы
+        constexpr uint32_t DEFAULT_CHECK_INTERVAL_MS = 100;  // Интервал проверки расписания по умолчанию (мс)
+        constexpr uint32_t TASK_STOP_TIMEOUT_MS = 1000;     // Таймаут ожидания остановки задачи (мс)
+        constexpr uint32_t TASK_STOP_CHECK_INTERVAL_MS = 100; // Интервал проверки остановки задачи (мс)
+        
+        // Прочие константы
+        constexpr uint32_t TEST_EVENT_DELAY_SEC = 60;    // Задержка для тестового события (сек)
+        constexpr uint8_t MAX_STOP_ATTEMPTS = 10;        // Максимальное количество попыток остановки задачи
+    }
+
     // Константы для MQTT
     namespace mqtt
     {
@@ -176,7 +197,7 @@ namespace farm::config
         // Временные константы для сенсоров
         namespace timing
         {
-            constexpr unsigned long DEFAULT_READ_INTERVAL = 10000; // 10 секунд между считываниями с датчиков
+            constexpr unsigned long DEFAULT_READ_INTERVAL = 10000; // период между считываниями с датчиков
         }
     }
 
@@ -184,6 +205,19 @@ namespace farm::config
     namespace actuators
     {
         
+    }
+    
+    // Константы для основного цикла
+    namespace loop
+    {
+        constexpr uint32_t DEFAULT_DELAY_MS = 100; // Стандартная задержка в конце основного цикла (мс)
+    }
+    
+    // Константы для NTP и времени
+    namespace time
+    {
+        constexpr int8_t DEFAULT_GMT_OFFSET = 3; // Стандартный часовой пояс GMT+3
+        constexpr unsigned long NTP_PERIOD = 60000; // 1 минута
     }
     
     // Команды управления, используемые в топике MQTT command
@@ -237,7 +271,7 @@ namespace farm::log // это не конфиг, чисто для логгер�
         constexpr const char* STYLE_BOLD    = "\033[1m";
         
         // Константы для MQTT логгера
-        constexpr unsigned long MQTT_LOG_SEND_INTERVAL = 1000;  // Интервал отправки логов по MQTT (миллисекунды)
+        constexpr unsigned long MQTT_LOG_SEND_INTERVAL = 100000;  // Интервал отправки логов по MQTT (миллисекунды)
         constexpr const char* MQTT_LOG_TOPIC_SUFFIX = "/log";   // Суффикс топика для отправки логов
         constexpr farm::log::Level MQTT_LOG_MIN_LEVEL = farm::log::Level::Debug; // Минимальный уровень для отправки в MQTT
         constexpr size_t MAX_BUFFER_SIZE = 100; // Максимальный размер буфера логов

@@ -58,7 +58,19 @@ namespace farm::log
     // Реализация MQTTLogTransport
     MQTTLogTransport::MQTTLogTransport() : lastSendTime(0), logBuffer()
     {
-        // Конструктор
+#ifdef USE_FREERTOS
+        // Создаем мьютекс для безопасного доступа к буферу логов
+        logMutex = xSemaphoreCreateMutex();
+#endif
+    }
+
+    MQTTLogTransport::~MQTTLogTransport()
+    {
+#ifdef USE_FREERTOS
+        if (logMutex != NULL) {
+            vSemaphoreDelete(logMutex);
+        }
+#endif
     }
     
     void MQTTLogTransport::write(Level level, const String& message)
@@ -66,6 +78,11 @@ namespace farm::log
         // Проверяем, что уровень сообщения достаточен для отправки
         if (static_cast<int>(level) <= static_cast<int>(constants::MQTT_LOG_MIN_LEVEL))
         {
+#ifdef USE_FREERTOS
+            // Пытаемся захватить мьютекс с таймаутом
+            if (logMutex != NULL && xSemaphoreTake(logMutex, portMAX_DELAY) == pdTRUE) 
+            {
+#endif
             // Проверяем размер буфера и удаляем старые сообщения при необходимости
             if (logBuffer.size() >= constants::MAX_BUFFER_SIZE)
             {
@@ -75,6 +92,12 @@ namespace farm::log
             // Добавляем сообщение в буфер
             logBuffer.push_back(message);
                 
+#ifdef USE_FREERTOS
+                // Освобождаем мьютекс
+                xSemaphoreGive(logMutex);
+            }
+#endif
+                
             // Отправляем логи, если прошло достаточно времени и MQTT подключен
             processLogs();
         }
@@ -82,12 +105,22 @@ namespace farm::log
     
     void MQTTLogTransport::flushLogs()
     {
+#ifdef USE_FREERTOS
+        // Пытаемся захватить мьютекс с таймаутом
+        if (logMutex == NULL || xSemaphoreTake(logMutex, portMAX_DELAY) != pdTRUE) {
+            return;
+        }
+#endif
+        
         // Получаем экземпляр MQTTManager через синглтон
         auto mqttManager = farm::net::MQTTManager::getInstance();
         
         // Если буфер пуст или MQTT не настроен или не подключен, выходим
         if (logBuffer.empty() || !mqttManager->isMqttInitialized() || !mqttManager->isClientConnected()) 
         {
+#ifdef USE_FREERTOS
+            xSemaphoreGive(logMutex);
+#endif
             return;
         }
         
@@ -152,6 +185,11 @@ namespace farm::log
             logBuffer.clear();
             lastSendTime = millis();
         }
+        
+#ifdef USE_FREERTOS
+        // Освобождаем мьютекс
+        xSemaphoreGive(logMutex);
+#endif
     }
     
     void MQTTLogTransport::processLogs()
@@ -165,6 +203,11 @@ namespace farm::log
             return;
         }
         
+#ifdef USE_FREERTOS
+        // Пытаемся захватить мьютекс с таймаутом
+        if (logMutex != NULL && xSemaphoreTake(logMutex, portMAX_DELAY) == pdTRUE) 
+        {
+#endif
         // Проверяем, прошло ли достаточно времени с момента последней отправки
         unsigned long currentTime = millis();
         if ((!logBuffer.empty() && 
@@ -172,9 +215,22 @@ namespace farm::log
             (logBuffer.size() >= constants::MAX_BUFFER_SIZE)) && 
             mqttManager->isClientConnected()) 
         {
+#ifdef USE_FREERTOS
+                // Освобождаем мьютекс перед вызовом flushLogs, так как он сам захватит мьютекс
+                xSemaphoreGive(logMutex);
+#endif
+                
             // Отправляем накопленные логи
             flushLogs();
         }
+#ifdef USE_FREERTOS
+            else
+            {
+                // Освобождаем мьютекс
+                xSemaphoreGive(logMutex);
+            }
+        }
+#endif
     }
 
     // Реализация Logger

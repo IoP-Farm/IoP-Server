@@ -26,6 +26,12 @@ namespace farm::net
         // Логгер
         std::shared_ptr<farm::log::ILogger> logger;
         
+        // Флаг инициализации
+        bool initialized;
+        
+        // Предыдущее состояние WiFi
+        bool lastWifiState;
+        
     public:
         // Получение экземпляра синглтона
         static std::shared_ptr<OTAManager> getInstance(std::shared_ptr<farm::log::ILogger> logger = nullptr);
@@ -48,5 +54,8 @@ namespace farm::net
         
         // Обработка OTA-запросов, вызывать в цикле loop()
         void handle();
+        
+        // Проверка состояния инициализации
+        bool isInitialized() const;
     };
 }

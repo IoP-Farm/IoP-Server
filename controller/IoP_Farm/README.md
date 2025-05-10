@@ -288,7 +288,7 @@ logger->log(farm::log::Level::Info, "Температура: %.1f°C", temperatu
 
 ```cpp
 // Создание и инициализация датчика
-auto dht22 = std::make_shared<farm::sensors::DHT22_Temperature>(logger,             farm::config::sensors::pins::DHT22_PIN);
+auto dht22 = std::make_shared<farm::sensors::DHT22_Temperature>(logger, farm::config::sensors::pins::DHT22_PIN);
 dht22->initialize();
 
 // Чтение данных

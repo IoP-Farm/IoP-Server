@@ -354,20 +354,20 @@ void setup() {
     auto logger = farm::log::LoggerFactory::createSerialMQTTLogger(farm::log::Level::Info);
     
     // Менеджеры
-    auto configManager = farm::config::ConfigManager::getInstance(logger);
-    auto wifiManager = farm::net::MyWiFiManager::getInstance(logger);
-    auto mqttManager = farm::net::MQTTManager::getInstance(logger);
-    auto sensorsManager = farm::sensors::SensorsManager::getInstance(logger);
-    auto otaManager = farm::net::OTAManager::getInstance(logger);
+    auto configManager    = farm::config::ConfigManager::getInstance(logger);
+    auto wifiManager      = farm::net::MyWiFiManager::getInstance(logger);
+    auto mqttManager      = farm::net::MQTTManager::getInstance(logger);
+    auto sensorsManager   = farm::sensors::SensorsManager::getInstance(logger);
+    auto otaManager       = farm::net::OTAManager::getInstance(logger);
     auto webServerManager = farm::net::WebServerManager::getInstance(logger);
     auto schedulerManager = farm::utils::Scheduler::getInstance(logger);
     
     // Инициализация
-    configManager->initialize();
-    wifiManager->initialize();
-    mqttManager->initialize();
-    sensorsManager->initialize();
-    otaManager->initialize();
+    configManager   ->initialize();
+    wifiManager     ->initialize();
+    mqttManager     ->initialize();
+    sensorsManager  ->initialize();
+    otaManager      ->initialize();
     webServerManager->initialize();
     schedulerManager->initialize(farm::config::time::DEFAULT_GMT_OFFSET);
 }

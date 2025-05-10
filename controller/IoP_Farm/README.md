@@ -22,6 +22,7 @@
 - [Важные замечания](#важные-замечания)
 - [Контакты и поддержка](#контакты-и-поддержка)
 - [Сервер-посредник и хранение данных](#сервер-посредник-и-хранение-данных)
+- [Минимальные примеры кода](#минимальные-примеры-кода)
 
 ---
 
@@ -271,6 +272,129 @@ P.S: на данный момент все сервисы запущены в ф
 
 ---
 
+## Минимальные примеры кода
+
+### Логирование
+
+```cpp
+// Создание логгера
+auto logger = farm::log::LoggerFactory::createSerialMQTTLogger(farm::log::Level::Info);
+
+// Использование
+logger->log(farm::log::Level::Info, "Температура: %.1f°C", temperature);
+```
+
+### Датчики
+
+```cpp
+// Создание и инициализация датчика
+auto dht22 = std::make_shared<farm::sensors::DHT22_Temperature>(logger,             farm::config::sensors::pins::DHT22_PIN);
+dht22->initialize();
+
+// Чтение данных
+float temp = dht22->read();
+dht22->saveMeasurement();
+```
+
+### Планировщик
+
+```cpp
+// Создание планировщика
+auto scheduler = farm::utils::Scheduler::getInstance(logger);
+scheduler->initialize(farm::config::time::DEFAULT_GMT_OFFSET);
+
+// Планирование событий
+scheduler->scheduleOnceAt("12:00", []() {
+    // Действие в полдень
+});
+
+scheduler->schedulePeriodicAt("08:00", 3600, []() {
+    // Действие каждый час с 8:00
+});
+```
+
+### MQTT
+
+```cpp
+// Инициализация MQTT
+auto mqtt = farm::net::MQTTManager::getInstance(logger);
+mqtt->initialize();
+
+// Публикация данных с датчиков
+mqtt->publishData();
+```
+
+### OTA Обновления
+
+```cpp
+// Инициализация OTA
+auto ota = farm::net::OTAManager::getInstance(logger);
+ota->initialize();
+
+// В loop()
+ota->handle();
+```
+
+### Веб-сервер
+
+```cpp
+// Инициализация веб-сервера
+auto webServer = farm::net::WebServerManager::getInstance(logger);
+webServer->initialize();
+
+// В loop()
+webServer->handleClient();
+```
+
+## Пример полной инициализации
+
+```cpp
+void setup() {
+    // Логгер
+    auto logger = farm::log::LoggerFactory::createSerialMQTTLogger(farm::log::Level::Info);
+    
+    // Менеджеры
+    auto configManager = farm::config::ConfigManager::getInstance(logger);
+    auto wifiManager = farm::net::MyWiFiManager::getInstance(logger);
+    auto mqttManager = farm::net::MQTTManager::getInstance(logger);
+    auto sensorsManager = farm::sensors::SensorsManager::getInstance(logger);
+    auto otaManager = farm::net::OTAManager::getInstance(logger);
+    auto webServerManager = farm::net::WebServerManager::getInstance(logger);
+    auto schedulerManager = farm::utils::Scheduler::getInstance(logger);
+    
+    // Инициализация
+    configManager->initialize();
+    wifiManager->initialize();
+    mqttManager->initialize();
+    sensorsManager->initialize();
+    otaManager->initialize();
+    webServerManager->initialize();
+    schedulerManager->initialize(farm::config::time::DEFAULT_GMT_OFFSET);
+}
+```
+
+## Основной цикл
+
+```cpp
+void loop() {
+    // Поддержка соединений
+    wifiManager->maintainConnection();
+    mqttManager->maintainConnection();
+    
+    // Обработка датчиков
+    sensorsManager->loop();
+    
+    // Проверка расписания
+    schedulerManager->checkSchedule();
+    
+    // OTA и веб-сервер
+    otaManager->handle();
+    webServerManager->handleClient();
+    
+    delay(farm::config::loop::DEFAULT_DELAY_MS);
+}
+```
+
 ## FAQ и советы
 
 - **Нужно ли каждый раз подключаться к WiFi?** Нет, только при первом запуске или сбросе настроек. Для работы актуаторов требуется хотя бы однократная синхронизация времени через интернет.
@@ -294,4 +418,6 @@ P.S: на данный момент все сервисы запущены в ф
 Либо можете написать мне лично: t.me/@medveduuk
 
 ---
+
+
 

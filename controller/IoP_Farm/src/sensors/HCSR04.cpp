@@ -4,32 +4,28 @@
 
 namespace farm::sensors
 {
-    // Конструктор
     HCSR04::HCSR04(std::shared_ptr<log::ILogger> logger, uint8_t trigPin, uint8_t echoPin)
-        : trigPin(trigPin),
+        : ISensor(),
+          trigPin(trigPin),
           echoPin(echoPin),
-          containerDepth(calibration::HCSR04_DEFAULT_CONTAINER_DEPTH)
+          containerDepth(calibration::HCSR04_DEFAULT_CONTAINER_DEPTH),
+          A(calibration::HCSR04_A),
+          B(calibration::HCSR04_B)
     {
-        // Сохраняем логгер
         this->logger = logger;
         
-        // Устанавливаем параметры датчика
         setSensorName(names::HCSR04);
         setMeasurementType(json_keys::WATER_LEVEL);
         setUnit(units::PERCENT); 
         
-        // Разрешаем считывание и сохранение данных
         shouldBeRead = true;
         shouldBeSaved = true;
         
-        // Инициализируем значение как "нет данных"
         lastMeasurement = calibration::NO_DATA;
     }
     
-    // Инициализация датчика
     bool HCSR04::initialize()
     {
-        // Проверяем, что пины в допустимом диапазоне
         if (trigPin == calibration::UNINITIALIZED_PIN || echoPin == calibration::UNINITIALIZED_PIN)
         {
             logger->log(Level::Error, 
@@ -37,11 +33,9 @@ namespace farm::sensors
             return false;
         }
         
-        // Настраиваем пины
         pinMode(trigPin, OUTPUT);
         pinMode(echoPin, INPUT);
         
-        // Устанавливаем начальное состояние Trig пина в LOW
         digitalWrite(trigPin, LOW);
         
         initialized = true;
@@ -59,11 +53,9 @@ namespace farm::sensors
             return calibration::SENSOR_ERROR_VALUE;
         }
         
-        // Очищаем Trig пин (устанавливаем LOW)
         digitalWrite(trigPin, LOW);
         delayMicroseconds(2);
         
-        // Устанавливаем Trig пин в HIGH на 10 микросекунд
         digitalWrite(trigPin, HIGH);
         delayMicroseconds(10);
         digitalWrite(trigPin, LOW);
@@ -93,44 +85,43 @@ namespace farm::sensors
             return calibration::SENSOR_ERROR_VALUE;
         }
 
+        logger->log(Level::Debug, "[HCSR04] Измеренное расстояние: %.2f см", distanceCm);
+
+        distanceCm = static_cast<float>(A * static_cast<double>(distanceCm) + B);
+
+        logger->log(Level::Debug, "[HCSR04] Расстояние до микросхемы: %.2f см", distanceCm);
+
         return distanceCm;
     }
     
     // Считать уровень воды в процентах от максимума
     float HCSR04::read()
     {
-        // Получаем расстояние до поверхности
+        // Получаем расстояние до поверхности воды в сантиметрах
         float distanceCm = readDistance();
         
-        // Если произошла ошибка при измерении расстояния
         if (distanceCm == calibration::SENSOR_ERROR_VALUE)
         {
             lastMeasurement = calibration::SENSOR_ERROR_VALUE;
-            logger->log(Level::Error, 
-                      "[HCSR04] Ошибка при измерении расстояния");
             return calibration::SENSOR_ERROR_VALUE;
         }
         
-        // Вычисляем уровень воды в сантиметрах: глубина контейнера - расстояние до поверхности
         float waterLevelCm = containerDepth - distanceCm;
         
         // Ограничиваем уровень от 0 до глубины контейнера
         waterLevelCm = constrain(waterLevelCm, 0.0f, containerDepth);
         
-        // Расчет процента наполнения (0-100%)
         // Вычисляем максимальный уровень воды с учетом константы HCSR04_FULL_TANK_PERCENT
         float maxWaterLevel = containerDepth * (calibration::HCSR04_FULL_TANK_PERCENT / 100.0f);
         
         // Вычисляем процент заполнения
         float waterLevelPercent = (waterLevelCm / maxWaterLevel) * 100.0f;
     
-        // Сохраняем результат в процентах
         lastMeasurement = waterLevelPercent;
         
         return waterLevelPercent;
     }
     
-    // Установить глубину контейнера
     void HCSR04::setContainerDepth(float depth)
     {
         if (depth <= 0.0f)
@@ -148,7 +139,6 @@ namespace farm::sensors
                   containerDepth);
     }
     
-    // Получить глубину контейнера
     float HCSR04::getContainerDepth() const
     {
         return containerDepth;

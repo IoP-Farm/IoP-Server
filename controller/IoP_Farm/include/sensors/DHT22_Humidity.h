@@ -56,10 +56,8 @@ namespace farm::sensors
     class DHT22_Humidity : public ISensor
     {
     private:
-        // Пин, к которому подключен датчик
         uint8_t pin;
         
-        // Указатель на объект DHT
         std::shared_ptr<DHT> dht;
         
         // Время последнего чтения данных с датчика (миллисекунды)
@@ -69,13 +67,10 @@ namespace farm::sensors
         static const unsigned long MIN_READ_INTERVAL = 2000; // 2 секунды согласно документации
         
     public:
-        // Конструктор
         DHT22_Humidity(std::shared_ptr<log::ILogger> logger, uint8_t pin);
         
-        // Деструктор
         ~DHT22_Humidity();
         
-        // Инициализация датчика
         bool initialize() override;
         
         // Считать влажность в процентах (0-100%)

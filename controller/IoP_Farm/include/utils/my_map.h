@@ -23,14 +23,13 @@ namespace farm::utils
     template<typename T, typename U>
     U MyMap(T x, T in_min, T in_max, U out_min, U out_max)
     {
-        // Проверяем корректность входных диапазонов
+        // Проверяем корректность входных диапазонов, чтобы избежать деления на ноль
         if (in_min == in_max) {
-            return out_min; // Избегаем деления на ноль
+            return out_min;
         }
         
         // Используем промежуточный тип double для повышения точности вычислений
-        // Выполняем преобразование по частям для лучшей читабельности
-        
+          
         double input_range = (double)(in_max - in_min);
         double output_range = (double)(out_max - out_min);
 

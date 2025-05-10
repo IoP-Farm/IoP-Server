@@ -5,10 +5,8 @@ namespace farm::sensors
     // Инициализация статической переменной
     std::map<int8_t, std::shared_ptr<DS18B20Resources>> DS18B20Common::s_resourceInstances;
     
-    // Получение экземпляров ресурсов по пину
     std::shared_ptr<DS18B20Resources> DS18B20Common::getInstance(int8_t pin, std::shared_ptr<ILogger> logger)
     {
-        // Проверка на неинициализированный пин
         if (pin == calibration::UNINITIALIZED_PIN)
         {
             logger->log(Level::Error, 
@@ -24,10 +22,7 @@ namespace farm::sensors
         
         // Создаем новые объекты, если они не существуют
         try {
-            // Создаем объект OneWire
-            auto oneWire = std::make_shared<OneWire>(pin);
-            
-            // Создаем объект DallasTemperature
+            auto oneWire = std::make_shared<OneWire>(pin);        
             auto sensors = std::make_shared<DallasTemperature>(oneWire.get());
             
             // Инициализируем шину 1-Wire и датчики
@@ -45,10 +40,8 @@ namespace farm::sensors
                       "[DS18B20Common] На пине %d обнаружено устройств: %d", 
                       pin, sensors->getDeviceCount());
             
-            // Создаем структуру ресурсов
             auto resources = std::make_shared<DS18B20Resources>(oneWire, sensors);
             
-            // Сохраняем в статической карте
             s_resourceInstances[pin] = resources;
             
             return resources;
@@ -59,7 +52,6 @@ namespace farm::sensors
         }
     }
     
-    // Освобождение экземпляров для указанного пина
     void DS18B20Common::releaseInstance(int8_t pin)
     {
         auto it = s_resourceInstances.find(pin);
@@ -68,7 +60,6 @@ namespace farm::sensors
         }
     }
     
-    // Освобождение всех экземпляров
     void DS18B20Common::releaseAll()
     {
         s_resourceInstances.clear();

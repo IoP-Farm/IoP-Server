@@ -1,21 +1,20 @@
 #include "network/mqtt_manager.h"
+#include "logic/actuators_manager.h"
 #include <WiFi.h>
 
 namespace farm::net
 {
-    // Используем константы MQTT и сокращаем пространства имен для удобства
     using namespace farm::config::mqtt;
     using farm::config::ConfigType;
     using farm::config::CommandCode;
     using farm::log::Level;
     using namespace farm::config::sensors;
-    // Инициализация статического экземпляра
+
+    // Инициализация статического экземпляра (паттерн Singleton)
     std::shared_ptr<MQTTManager> MQTTManager::instance = nullptr;
     
-    // Конструктор
     MQTTManager::MQTTManager(std::shared_ptr<farm::log::ILogger> logger)
     {
-        // Если логгер не передан, создаем новый с помощью фабрики
         if (!logger) 
         {
             this->logger = farm::log::LoggerFactory::createSerialLogger(Level::Info);
@@ -25,11 +24,10 @@ namespace farm::net
             this->logger = logger;
         }
         
-        // Получаем экземпляр ConfigManager
         configManager = farm::config::ConfigManager::getInstance(this->logger);
     }
     
-    // Получение экземпляра синглтона
+    // Получение экземпляра (паттерн Singleton)
     std::shared_ptr<MQTTManager> MQTTManager::getInstance(std::shared_ptr<farm::log::ILogger> logger)
     {
         if (instance == nullptr) 
@@ -40,24 +38,20 @@ namespace farm::net
         return instance;
     }
     
-    // Деструктор
     MQTTManager::~MQTTManager()
     {
         logger->log(Level::Debug, "[MQTT] Освобождение ресурсов MQTT Manager");
         
-        // Отключаемся от MQTT сервера
         if (mqttClient.connected()) 
         {
             mqttClient.disconnect();
         }
     }
     
-    // Инициализация MQTT и настройка колбэков
     bool MQTTManager::initialize()
     {
         logger->log(Level::Farm, "[MQTT] Инициализация MQTT");
         
-        // Проверяем настройки MQTT
         if (!isMqttConfigured()) 
         {
             logger->log(Level::Warning, 
@@ -66,11 +60,8 @@ namespace farm::net
             return false;
         }
         
-        // Настройка MQTT клиента
         setupMQTTClient();
 
-
-        // Устанавливаем флаг успешной инициализации
         isInitialized = true;
 
         static bool tryFirst = true;
@@ -99,15 +90,12 @@ namespace farm::net
         return true;
     }
     
-    // Настройка MQTT клиента и колбэков
     bool MQTTManager::setupMQTTClient()
     {
-        // Получаем настройки MQTT из конфигурации
         String host     = configManager->getValue<String>(ConfigType::Mqtt,  "host");
         int16_t port    = configManager->getValue<int16_t>(ConfigType::Mqtt, "port");
         String deviceId = configManager->getValue<String>(ConfigType::Mqtt,  "deviceId");
         
-        // Сохраняем информацию о сервере
         serverDomain = host;
         serverPort   = port;
 
@@ -131,7 +119,6 @@ namespace farm::net
             logger->log(Level::Info, 
                       "[MQTT] Подключение к серверу будет производиться по IP");
             
-            // Установка IP-адреса и порта
             mqttClient.setServer(serverIP, serverPort);
         } 
         else 
@@ -140,11 +127,10 @@ namespace farm::net
             logger->log(Level::Info, 
                       "[MQTT] Подключение к серверу будет производиться по имени хоста");
             
-            // Установка параметров сервера по строке хоста
+            // Установка параметров сервера по СТРОКЕ хоста
             mqttClient.setServer(serverDomain.c_str(), serverPort);
         }
         
-        // Установка clientId
         if (deviceId.length() > 0)  
         {
             strncpy(deviceIdBuffer, deviceId.c_str(), deviceId.length());  
@@ -190,7 +176,6 @@ namespace farm::net
         return true;
     }
     
-    // Проверка, настроен ли MQTT
     bool MQTTManager::isMqttConfigured() const
     {
         // MQTT настроен, если указаны хост и порт
@@ -200,7 +185,6 @@ namespace farm::net
                configManager->getValue<int16_t>(ConfigType::Mqtt, "port") >= 0;
     }
     
-    // Получить топик MQTT в зависимости от типа
     String MQTTManager::getMqttTopic(ConfigType type) const
     {
         String deviceId = configManager->hasKey(ConfigType::Mqtt, "deviceId") 
@@ -287,12 +271,12 @@ namespace farm::net
                   "[MQTT] Отключено от сервера. Причина: %s", reasonStr);
     }
     
-    // Обработчик успешной подписки
+    // Обработчик успешной подписки на топик
     void MQTTManager::onMqttSubscribe(uint16_t packetId, uint8_t qos)
     {
     }
     
-    // Обработчик успешной отписки
+    // Обработчик успешной отписки на топик
     void MQTTManager::onMqttUnsubscribe(uint16_t packetId)
     {
         logger->log(Level::Debug, 
@@ -314,10 +298,8 @@ namespace farm::net
         logger->log(Level::Debug, 
                   "[MQTT] Получено сообщение в топик '%s'", topic);
         
-        // Обработка сообщений в зависимости от топика
         String topicStr(topic);
         
-        // Получаем топики из конфигурации
         String configTopic  = getMqttTopic(ConfigType::System);
         String commandTopic = getMqttTopic(ConfigType::Command);
         
@@ -327,12 +309,31 @@ namespace farm::net
             logger->log(Level::Info, 
                       "[MQTT] Обновление Config");
             
-            // Обновляем системную конфигурацию
             bool updated = configManager->updateFromJson(ConfigType::System, message);
             if (updated) 
             {
                 configManager->saveConfig(ConfigType::System);
                 configManager->printConfig(ConfigType::System);
+                auto actuatorsManager = farm::logic::ActuatorsManager::getInstance();
+                if (actuatorsManager && actuatorsManager->isInitialized())
+                {
+                    bool result = actuatorsManager->updateStrategies();
+                    if (result)
+                    {
+                        logger->log(Level::Info, 
+                                "[MQTT] Конфигурация всех стратегий успешно обновлена");
+                    }
+                    else
+                    {
+                        logger->log(Level::Warning, 
+                                "[MQTT] Ошибка при обновлении конфигурации стратегий");
+                    }
+                }
+                else
+                {
+                    logger->log(Level::Error, 
+                            "[MQTT] Не удалось получить экземпляр ActuatorsManager для обновления конфигурации стратегий");
+                }
             }
             else 
             {
@@ -346,17 +347,14 @@ namespace farm::net
             logger->log(Level::Info, 
                       "[MQTT] Обработка полученной команды");
             
-            // Обновляем команду
             bool updated = configManager->updateFromJson(ConfigType::Command, message);
             if (updated) 
             {
                 configManager->saveConfig(ConfigType::Command);
                 configManager->printConfig(ConfigType::Command);
                 
-                // Получаем код команды
                 int commandInt = configManager->getValue<int>(ConfigType::Command, "command");
                 
-                // Приводим к CommandCode и обрабатываем
                 CommandCode command = static_cast<CommandCode>(commandInt);
                 handleCommand(command);
             }
@@ -367,13 +365,11 @@ namespace farm::net
             }
         }
         
-        // Освобождаем память
         delete[] message;
 
         digitalWrite(pins::LED_PIN, LOW);
     }
     
-    // Обработчик успешной публикации
     void MQTTManager::onMqttPublish(uint16_t packetId)
     {
         digitalWrite(pins::LED_PIN, HIGH);
@@ -381,7 +377,6 @@ namespace farm::net
         digitalWrite(pins::LED_PIN, LOW);
     }
     
-    // Подписка на конкретный топик
     uint16_t MQTTManager::subscribeToTopic(const String& topic, uint8_t qos)
     {
         if (!isClientConnected()) 
@@ -391,7 +386,6 @@ namespace farm::net
             return 0;
         }
         
-        // Отправляем запрос на подписку
         uint16_t packetId = mqttClient.subscribe(topic.c_str(), qos);
         
         if (packetId > 0)
@@ -410,7 +404,6 @@ namespace farm::net
         return packetId;
     }
     
-    // Подписка на все стандартные топики (публичный метод)
     bool MQTTManager::subscribeToAllTopics(uint8_t qos)
     {
         if (!isClientConnected()) 
@@ -420,11 +413,9 @@ namespace farm::net
             return false;
         }
         
-        // Получаем топики из конфигурации
         String configTopic  = getMqttTopic(ConfigType::System);
         String commandTopic = getMqttTopic(ConfigType::Command);
         
-        // Подписываемся на топики конфигурации и команд
         uint16_t packetIdConfig  = subscribeToTopic(configTopic, qos);
         uint16_t packetIdCommand = subscribeToTopic(commandTopic, qos);
         
@@ -434,67 +425,36 @@ namespace farm::net
         return success;
     }
     
-    // Обработка полученной команды
     void MQTTManager::handleCommand(const CommandCode& command)
     {
         logger->log(Level::Info, 
                   "[MQTT] Обработка команды %d", static_cast<int>(command));
         
-        // Обработка разных команд
-        switch (command) 
+        // Все команды перенаправляем в ActuatorsManager
+        auto actuatorsManager = farm::logic::ActuatorsManager::getInstance();
+        if (actuatorsManager && actuatorsManager->isInitialized())
         {
-            case CommandCode::ESP_RESTART:
+            bool result = actuatorsManager->handleMqttCommand(command);
+            if (result)
+            {
+                logger->log(Level::Info, 
+                          "[MQTT] Команда %d успешно обработана ActuatorsManager", 
+                          static_cast<int>(command));
+            }
+            else
+            {
                 logger->log(Level::Warning, 
-                          "[MQTT] Получена команда на перезагрузку ESP");
-                // Добавим задержку, чтобы ответ успел уйти
-                delay(200);
-                ESP.restart();
-                break;
-                
-            case CommandCode::PUMP_ON:
-                logger->log(Level::Info, 
-                          "[MQTT] Команда включения насоса (заглушка)");
-                // TODO: Реализовать включение насоса
-                break;
-                
-            case CommandCode::PUMP_OFF:
-                logger->log(Level::Info, 
-                          "[MQTT] Команда выключения насоса (заглушка)");
-                // TODO: Реализовать выключение насоса
-                break;
-                
-            case CommandCode::GROWLIGHT_ON:
-                logger->log(Level::Info, 
-                          "[MQTT] Команда включения фитолампы (заглушка)");
-                // TODO: Реализовать включение фитолампы
-                break;
-                
-            case CommandCode::GROWLIGHT_OFF:
-                logger->log(Level::Info, 
-                          "[MQTT] Команда выключения фитолампы (заглушка)");
-                // TODO: Реализовать выключение фитолампы
-                break;
-                
-            case CommandCode::HEATLAMP_ON:
-                logger->log(Level::Info, 
-                          "[MQTT] Команда включения лампы нагрева (заглушка)");
-                // TODO: Реализовать включение лампы нагрева
-                break;
-                
-            case CommandCode::HEATLAMP_OFF:
-                logger->log(Level::Info, 
-                          "[MQTT] Команда выключения лампы нагрева (заглушка)");
-                // TODO: Реализовать выключение лампы нагрева
-                break;
-                
-            default:
-                logger->log(Level::Warning, 
-                          "[MQTT] Неизвестная команда: %d", static_cast<int>(command));
-                break;
+                          "[MQTT] Ошибка при обработке команды %d в ActuatorsManager", 
+                          static_cast<int>(command));
+            }
+        }
+        else
+        {
+            logger->log(Level::Error, 
+                      "[MQTT] Не удалось получить экземпляр ActuatorsManager для обработки команды");
         }
     }
     
-    // Поддержание MQTT соединения
     void MQTTManager::maintainConnection()
     {
         // Периодическая проверка MQTT соединения
@@ -518,7 +478,6 @@ namespace farm::net
             // Если не подключены к MQTT, но подключены к WiFi
             if (!isClientConnected() && WiFi.isConnected() && isMqttConfigured()) 
             {
-                // Не пытаемся переподключаться слишком часто и не в процессе подключения
                 if (!isConnecting && (currentMillis - lastReconnectTime >= RECONNECT_RETRY_INTERVAL)) 
                 {
                     lastReconnectTime = currentMillis;
@@ -543,10 +502,8 @@ namespace farm::net
             return false;
         }
         
-        // Получаем топик для данных
         String dataTopic = getMqttTopic(ConfigType::Data);
         
-        // Получаем данные из конфигурации
         String jsonData = configManager->getConfigJson(ConfigType::Data);
         
         // Публикуем данные (QoS=1, retain=true)
@@ -578,7 +535,6 @@ namespace farm::net
             return 0;
         }
         
-        // Отправляем запрос на отписку
         uint16_t packetId = mqttClient.unsubscribe(topic.c_str());
         
         if (packetId > 0)
@@ -597,7 +553,6 @@ namespace farm::net
         return packetId;
     }
     
-    // Отписка от всех подписанных топиков
     bool MQTTManager::unsubscribeFromAllTopics()
     {
         if (!isClientConnected()) 
@@ -607,7 +562,6 @@ namespace farm::net
             return false;
         }
         
-        // Отписываемся от топиков конфигурации и команд
         String configTopic  = getMqttTopic(ConfigType::System);
         String commandTopic = getMqttTopic(ConfigType::Command);
         
@@ -624,16 +578,13 @@ namespace farm::net
         return success;
     }
     
-    // Проверка состояния подключения
     bool MQTTManager::isClientConnected() const
     {
         return isConnected && mqttClient.connected();
     }
     
-    // Установка хоста MQTT
     bool MQTTManager::setMqttHost(const String& host)
     {
-        // Проверяем, что хост не пустой
         if (host.length() == 0) 
         {
             logger->log(Level::Warning, 
@@ -641,7 +592,6 @@ namespace farm::net
             return false;
         }
         
-        // Сохраняем хост в конфигурации
         configManager->setValue<String>(ConfigType::Mqtt, "host", host);
         bool saved = configManager->saveConfig(ConfigType::Mqtt);
         
@@ -665,7 +615,6 @@ namespace farm::net
         return saved;
     }
     
-    // Установка порта MQTT
     bool MQTTManager::setMqttPort(uint16_t port)
     {
         // Проверяем валидность порта (0 обычно недопустим, стандартные порты MQTT: 1883 или 8883 для TLS)
@@ -676,7 +625,6 @@ namespace farm::net
             return false;
         }
         
-        // Сохраняем порт в конфигурации
         configManager->setValue<int16_t>(ConfigType::Mqtt, "port", port);
         bool saved = configManager->saveConfig(ConfigType::Mqtt);
         
@@ -700,10 +648,8 @@ namespace farm::net
         return saved;
     }
     
-    // Установка deviceId для MQTT
     bool MQTTManager::setMqttDeviceId(const String& deviceId)
     {
-        // Проверяем, что deviceId не пустой
         if (deviceId.length() == 0) 
         {
             logger->log(Level::Warning, 
@@ -711,7 +657,6 @@ namespace farm::net
             return false;
         }
         
-        // Сохраняем deviceId в конфигурации
         configManager->setValue<String>(ConfigType::Mqtt, "deviceId", deviceId);
         bool saved = configManager->saveConfig(ConfigType::Mqtt);
         
@@ -744,7 +689,6 @@ namespace farm::net
         success &= setMqttPort(port);   
         success &= setMqttDeviceId(deviceId);
         
-        // Если успешно обновили настройки и у нас есть все необходимое для подключения
         if (success && isMqttConfigured()) 
         {
             // Если уже были инициализированы, но параметры изменились
@@ -752,7 +696,6 @@ namespace farm::net
                 (serverDomain != host || serverPort != port || 
                  configManager->getValue<String>(ConfigType::Mqtt, "deviceId") != deviceId))
             {
-                // Отключаемся от текущего сервера, если были подключены
                 if (mqttClient.connected()) 
                 {
                     mqttClient.disconnect();
@@ -780,7 +723,6 @@ namespace farm::net
         return isInitialized;
     }
 
-    // Получение текущих настроек MQTT
     const String& MQTTManager::getMqttHost() const 
     { 
         return serverDomain; 
@@ -799,7 +741,6 @@ namespace farm::net
     // Публикация в произвольный топик
     bool MQTTManager::publishToTopic(const String& topic, const String& payload, uint8_t qos, bool retain)
     {
-        // Проверяем подключение
         if (!isClientConnected()) 
         {
             logger->log(Level::Warning, 
@@ -807,10 +748,8 @@ namespace farm::net
             return false;
         }
         
-        // Отправляем данные
         uint16_t packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
         
-        // Проверяем результат
         if (packetId > 0) 
         {
             logger->log(Level::Debug, 
@@ -829,15 +768,13 @@ namespace farm::net
 
     bool farm::net::MQTTManager::publishToTopicLoggerVersion(const String &topic, const String &payload, uint8_t qos, bool retain)
     {
-        // Уже проверил подключение
+        // Уже проверил подключение и тд
 
-        // Отправляем данные
         uint16_t packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
         
-        // Проверяем результат
         if (packetId > 0) 
         {
-            return true; // Никакого логгирования!! Потому что вызывает логгер
+            return true; // Никакого логгирования!! Потому что вызывает логгер (иначе будет зацикливание)
         } 
         else 
         {

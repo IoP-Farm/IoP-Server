@@ -7,13 +7,12 @@ using namespace farm::config::scheduler;
 using namespace farm::config;
 namespace farm::utils
 {
-    // Инициализация статического члена
+    // Инициализация статического члена (паттерн Singleton)
     std::shared_ptr<Scheduler> Scheduler::instance = nullptr;
     
-    // Конструктор
     Scheduler::Scheduler(std::shared_ptr<farm::log::ILogger> logger)
     {
-        // Инициализация логгера
+        // Инициализация логгера, если не передан, то создаем логгер по умолчанию
         if (!logger) 
         {
             this->logger = farm::log::LoggerFactory::createSerialLogger(farm::log::Level::Info);
@@ -24,14 +23,12 @@ namespace farm::utils
         }
     }
     
-    // Деструктор
     Scheduler::~Scheduler()
     {
 #ifdef USE_FREERTOS
         // Останавливаем задачу планировщика, если она запущена
         stopSchedulerTask();
         
-        // Удаляем мьютекс
         if (eventsMutex != nullptr)
         {
             vSemaphoreDelete(eventsMutex);
@@ -48,7 +45,6 @@ namespace farm::utils
         return NTP.online();
     }
     
-    // Инициализация планировщика
     bool Scheduler::initialize(int8_t gmtOffset)
     {
         if (initialized)
@@ -68,7 +64,7 @@ namespace farm::utils
         delay(100);
         
 #ifdef USE_FREERTOS
-        // Инициализация мьютекса
+        // Инициализация мьютекса для синхронизации доступа к списку событий
         eventsMutex = xSemaphoreCreateMutex();
         if (eventsMutex == nullptr)
         {
@@ -88,7 +84,7 @@ namespace farm::utils
         }
         else
         {
-            // в дальнейшем будет проверка NTP.online() == true/false во всех методах Scheduler'a
+            // Далее просто будет проверка NTP.online() == true/false во всех методах Scheduler'a
             logger->log(farm::log::Level::Warning, 
                       "[Scheduler] NTP не синхронизирован, все функции планировщика отключены");
             logger->log(farm::log::Level::Warning, 
@@ -104,7 +100,7 @@ namespace farm::utils
         return initialized;
     }
     
-    // Получение экземпляра синглтона
+    // Получение экземпляра (паттерн Singleton)
     std::shared_ptr<Scheduler> Scheduler::getInstance(std::shared_ptr<farm::log::ILogger> logger)
     {
         if (instance == nullptr) 
@@ -170,31 +166,27 @@ namespace farm::utils
         {
             Datime unixTimeDatime(unixTime);
             logger->log(farm::log::Level::Info, 
-                       "[Scheduler] Запланированное время %u уже прошло, переносим на завтра", unixTimeDatime.toString());
+                       "[Scheduler] Запланированное время %s уже прошло, переносим на завтра", unixTimeDatime.toString().c_str());
             
             // Извлекаем компоненты времени из unixTime (нам нужны только часы, минуты и секунды)
             Datime origTime(unixTime);
             
-            // Берем текущее время и создаем дату на завтра
             Datime currentDate(currentTime);
             
-            // Создаем временную точку для завтрашнего дня
             time_t tomorrow_time = currentTime + 24*60*60; // текущее время + 24 часа
             Datime tomorrow(tomorrow_time);
             
-            // Устанавливаем время суток из оригинальной даты
             tomorrow.hour = origTime.hour;
             tomorrow.minute = origTime.minute;
             tomorrow.second = origTime.second;
-            
-            // Получаем новое unix-время
+        
             unixTime = tomorrow.getUnix();
             
             logger->log(farm::log::Level::Info, 
-                       "[Scheduler] Новое запланированное время: %u", tomorrow.toString());
+                       "[Scheduler] Новое запланированное время: %s", tomorrow.toString());
         }
         
-        // Создаем новое событие
+        // Создаем новое одноразовое событие
         ScheduledEvent event;
         event.type = ScheduleType::ONCE;
         event.scheduledTime = unixTime;
@@ -293,28 +285,24 @@ namespace farm::utils
         {
             Datime unixTimeDatime(unixTime);
             logger->log(farm::log::Level::Info, 
-                       "[Scheduler] Запланированное время периодического события %u уже прошло, переносим первый запуск на завтра", unixTimeDatime.toString());
+                       "[Scheduler] Запланированное время периодического события %s уже прошло, переносим первый запуск на завтра", unixTimeDatime.toString().c_str());
             
             // Извлекаем компоненты времени из unixTime (нам нужны только часы, минуты и секунды)
             Datime origTime(unixTime);
             
-            // Берем текущее время и создаем дату на завтра
             Datime currentDate(currentTime);
             
-            // Создаем временную точку для завтрашнего дня
             time_t tomorrow_time = currentTime + 24*60*60; // текущее время + 24 часа
             Datime tomorrow(tomorrow_time);
             
-            // Устанавливаем время суток из оригинальной даты
             tomorrow.hour = origTime.hour;
             tomorrow.minute = origTime.minute;
             tomorrow.second = origTime.second;
             
-            // Получаем новое unix-время
             unixTime = tomorrow.getUnix();
             
             logger->log(farm::log::Level::Info, 
-                       "[Scheduler] Новое время первого запуска: %u", unixTime);
+                       "[Scheduler] Новое время первого запуска: %s", tomorrow.toString().c_str());
         }
         
         // Создаем новое периодическое событие
@@ -339,7 +327,7 @@ namespace farm::utils
         
         Datime dt(unixTime);
         logger->log(farm::log::Level::Debug, 
-                  "[Scheduler] Добавлено периодическое событие #%llu с началом %s и периодом %d сек", 
+                  "[Scheduler] Добавлено периодическое событие #%llu с началом %s и периодом %d с.", 
                   event.id, dt.toString().c_str(), periodSeconds);
     
         
@@ -353,14 +341,13 @@ namespace farm::utils
 
         return event.id;
     }
-    
-    // Удаление запланированного события по ID
+
     bool Scheduler::removeScheduledEvent(std::uint64_t eventId)
     {
         if (!initialized)
         {
             logger->log(farm::log::Level::Error,
-                     "[Scheduler] Попытка удалить событие до инициализации планировщика");
+                    "[Scheduler] Попытка удалить событие до инициализации планировщика");
             return false;
         }
 
@@ -383,7 +370,7 @@ namespace farm::utils
         
         if (it != events.end()) 
         {
-            logger->log(farm::log::Level::Debug, 
+            logger->log(farm::log::Level::Debug,
                       "[Scheduler] Удалено событие с ID %llu", eventId);
             events.erase(it);
             result = true;
@@ -406,7 +393,6 @@ namespace farm::utils
         return result;
     }
     
-    // Удаление всех событий
     void Scheduler::clearAllEvents()
     {
         if (!isNtpOnline()) return;
@@ -441,13 +427,11 @@ namespace farm::utils
 #endif
     }
     
-    // Проверка совпадения времени
     bool Scheduler::isTimeMatch(uint32_t currentTime, uint32_t scheduledTime) const
     {
         return currentTime >= scheduledTime;
     }
     
-    // Проверка, выполнялось ли событие сегодня
     bool Scheduler::wasTodayExecuted(const ScheduledEvent& event, uint32_t currentTime) const
     {
         if (event.lastExecutionTime == 0) 
@@ -455,15 +439,13 @@ namespace farm::utils
             return false;
         }
         
-        // Получаем начало текущего дня
         Datime current(currentTime);
         Datime startOfDay(current.year, current.month, current.day, 0, 0, 0);
         
-        // Если последнее выполнение было сегодня
         return event.lastExecutionTime >= startOfDay.getUnix();
     }
     
-    // Проверка и выполнение запланированных событий
+    // Проверка и выполнение запланированных событий, вызывается из задачи планировщика или из main.cpp в loop()
     void Scheduler::checkSchedule()
     {
         if (!initialized) 
@@ -505,30 +487,25 @@ namespace farm::utils
                                   "[Scheduler] Выполнение одноразового события #%llu", event.id);
                         
                         // Сохраняем копию callback перед освобождением мьютекса
-                        // ситуация: callback может быть удален из вектора событий из основного кода
-                        // во время выполнения callback
+                        // Зачем? callback может быть удален из вектора событий из основного кода
+                        // во время выполнения callback, и тогда мы получим segmentation fault
                         auto callback = event.callback;
                         
-                        // Помечаем задачу как выполненную
                         event.executed = true;
                         event.lastExecutionTime = currentTime;
                         
-                        // Добавляем индекс события в список для удаления
                         eventsToRemove.push_back(i);
                         
 #ifdef USE_FREERTOS
-                        // Освобождаем мьютекс перед вызовом callback
                         if (eventsMutex != nullptr)
                         {
                             xSemaphoreGive(eventsMutex);
                         }
 #endif
-                        
-                        // Выполняем callback
+    
                         callback();
                         
 #ifdef USE_FREERTOS
-                        // Снова получаем мьютекс после вызова callback
                         if (eventsMutex != nullptr && xSemaphoreTake(eventsMutex, portMAX_DELAY) != pdTRUE)
                         {
                             logger->log(farm::log::Level::Error, 
@@ -553,22 +530,19 @@ namespace farm::utils
                             // Сохраняем копию callback перед освобождением мьютекса
                             auto callback = event.callback;
                             
-                            // Обновляем время последнего выполнения
                             event.lastExecutionTime = currentTime;
                             
 #ifdef USE_FREERTOS
-                            // Освобождаем мьютекс перед вызовом callback
                             if (eventsMutex != nullptr)
                             {
                                 xSemaphoreGive(eventsMutex);
                             }
 #endif
                             
-                            // Выполняем callback
                             callback();
                             
 #ifdef USE_FREERTOS
-                            // Снова получаем мьютекс после вызова callback
+
                             if (eventsMutex != nullptr && xSemaphoreTake(eventsMutex, portMAX_DELAY) != pdTRUE)
                             {
                                 logger->log(farm::log::Level::Error, 
@@ -598,7 +572,6 @@ namespace farm::utils
         );
         
 #ifdef USE_FREERTOS
-        // Освобождаем мьютекс
         if (eventsMutex != nullptr)
         {
             xSemaphoreGive(eventsMutex);
@@ -612,6 +585,7 @@ namespace farm::utils
     }
 
 #ifdef USE_FREERTOS
+
     // Функция задачи FreeRTOS
     void Scheduler::schedulerTaskFunction(void *parameters)
     {
@@ -619,21 +593,17 @@ namespace farm::utils
         
         while (!scheduler->taskShouldExit)
         {
-            // Проверяем и выполняем запланированные события
             scheduler->checkSchedule();
             
-            // Ждем следующего интервала проверки
             vTaskDelay(scheduler->checkInterval);
         }
         
         scheduler->logger->log(farm::log::Level::Farm, 
                            "[Scheduler] Задача планировщика остановлена");
         
-        // Удаляем задачу
         vTaskDelete(NULL);
     }
     
-    // Запустить задачу планировщика
     bool Scheduler::startSchedulerTask(uint8_t priority, uint32_t stackSize)
     {
         if (!initialized)
@@ -642,8 +612,7 @@ namespace farm::utils
                      "[Scheduler] Попытка запустить задачу планировщика до инициализации");
             return false;
         }
-        
-        // Проверяем, запущена ли уже задача
+    
         if (isSchedulerTaskRunning())
         {
             logger->log(farm::log::Level::Warning, 
@@ -651,17 +620,15 @@ namespace farm::utils
             return false;
         }
         
-        // Сбрасываем флаг выхода
         taskShouldExit = false;
         
-        // Создаем задачу
         BaseType_t result = xTaskCreate(
-            schedulerTaskFunction,   // Функция задачи
-            "SchedulerTask",         // Имя задачи
-            stackSize,               // Размер стека
+            schedulerTaskFunction,   // Функция задачи планировщика
+            "SchedulerTask",         // Имя задачи планировщика
+            stackSize,               // Размер стека 
             this,                    // Параметр (указатель на экземпляр класса)
-            priority,                // Приоритет
-            &schedulerTaskHandle     // Хэндл задачи
+            priority,                // Приоритет задачи
+            &schedulerTaskHandle     // Хэндл задачи для управления
         );
         
         if (result != pdPASS)
@@ -677,7 +644,6 @@ namespace farm::utils
         return true;
     }
     
-    // Остановить задачу планировщика
     bool Scheduler::stopSchedulerTask()
     {
         if (!initialized)
@@ -687,7 +653,6 @@ namespace farm::utils
             return false;
         }
         
-        // Проверяем, запущена ли задача
         if (!isSchedulerTaskRunning())
         {
             logger->log(farm::log::Level::Warning, 
@@ -695,7 +660,6 @@ namespace farm::utils
             return false;
         }
         
-        // Устанавливаем флаг выхода
         taskShouldExit = true;
         
         // Ждем завершения задачи (с таймаутом)
@@ -708,7 +672,7 @@ namespace farm::utils
             vTaskDelay(pdMS_TO_TICKS(TASK_STOP_CHECK_INTERVAL_MS));
         }
         
-        // Если задача все еще запущена, удаляем ее принудительно
+        // Если задача ВСЕ ЕЩЕ запущена, удаляем ее принудительно
         if (isSchedulerTaskRunning())
         {
             logger->log(farm::log::Level::Warning, 
@@ -724,7 +688,6 @@ namespace farm::utils
         return true;
     }
     
-    // Проверить, запущена ли задача
     bool Scheduler::isSchedulerTaskRunning() const
     {
         if (!initialized)
@@ -737,13 +700,12 @@ namespace farm::utils
             return false;
         }
         
-        // Проверяем статус задачи
         eTaskState state = eTaskGetState(schedulerTaskHandle);
         
         return (state != eDeleted && state != eInvalid);
     }
 
-    // Установить интервал проверки расписания
+    // Установление интервал работы планировщика
     void Scheduler::setCheckInterval(uint32_t intervalMs)
     {
         if (!initialized)
@@ -753,7 +715,6 @@ namespace farm::utils
             return;
         }
         
-        // Преобразуем миллисекунды в тики
         checkInterval = pdMS_TO_TICKS(intervalMs);
         
         logger->log(farm::log::Level::Debug, 

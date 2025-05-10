@@ -4,7 +4,6 @@
 
 namespace farm::net
 {
-    // Используем константы WiFi и сокращаем пространства имен
     using namespace farm::config::wifi;
     using namespace farm::config::sensors;
     using farm::log::Level;
@@ -12,10 +11,9 @@ namespace farm::net
     using farm::config::ConfigType;
     using farm::log::ColorFormatter;
     
-    // Инициализация статического экземпляра
+    // Инициализация статического экземпляра (паттерн Singleton)
     std::shared_ptr<MyWiFiManager> MyWiFiManager::instance = nullptr;
     
-    // Конструктор
     MyWiFiManager::MyWiFiManager(std::shared_ptr<farm::log::ILogger> logger)
         : mqttServerParam(MQTT_SERVER_PARAM_ID, MQTT_SERVER_PARAM_LABEL, "", MQTT_SERVER_PARAM_LENGTH),
           mqttPortParam(MQTT_PORT_PARAM_ID, MQTT_PORT_PARAM_LABEL, MQTT_DEFAULT_PORT, MQTT_PORT_PARAM_LENGTH)
@@ -30,13 +28,12 @@ namespace farm::net
             this->logger = logger;
         }
         
-        // Настройка WiFiManager
         wifiManager.setDebugOutput(false);
         wifiManager.setConnectTimeout(CONNECT_TIMEOUT);
         wifiManager.setConfigPortalTimeout(PORTAL_TIMEOUT);
         wifiManager.setConfigPortalBlocking(false);
 
-        // Обратный вызов при активации точки доступа
+        // Колбэк при активации точки доступа
         wifiManager.setAPCallback([this](WiFiManager* wm) {
             portalActive = true;
             digitalWrite(pins::LED_PIN, HIGH);
@@ -45,16 +42,14 @@ namespace farm::net
                      apName.c_str(), apPassword.c_str());
         });
         
-        // Добавляем параметры в WiFiManager
+        // Добавление возможности ввести параметры MQTT в config portal
         wifiManager.addParameter(&mqttServerParam);
-        wifiManager.addParameter(&mqttPortParam);
-        
-        // Устанавливаем колбэк для сохранения параметров
+        wifiManager.addParameter(&mqttPortParam); 
         wifiManager.setSaveParamsCallback([this]() { this->saveParamsCallback(); });
     
     }
     
-    // Получение экземпляра синглтона
+    // Получение экземпляра (паттерн Singleton)
     std::shared_ptr<MyWiFiManager> MyWiFiManager::getInstance(std::shared_ptr<farm::log::ILogger> logger)
     {
         if (instance == nullptr) 
@@ -65,16 +60,8 @@ namespace farm::net
         return instance;
     }
     
-    // Деструктор
-    MyWiFiManager::~MyWiFiManager()
-    {
-        logger->log(Level::Debug, "[WiFi] Освобождение ресурсов WiFi Manager");
-    }
-    
-    // Колбэк для сохранения параметров
     void MyWiFiManager::saveParamsCallback()
     {
-        // Получаем значения из параметров
         String mqttServer = mqttServerParam.getValue();
         String mqttPort   = mqttPortParam.getValue();
         
@@ -102,17 +89,15 @@ namespace farm::net
         }
     }
     
-    // Инициализация WiFi и попытка подключения
     bool MyWiFiManager::initialize()
     {
         logger->log(Level::Farm, "[WiFi] Инициализация WIFI");
         
-        // Настройка точки доступа и имени хоста
         setAccessPointCredentials(DEFAULT_AP_NAME, DEFAULT_AP_PASSWORD);
         setHostName(DEFAULT_HOSTNAME);
 
         // Включение встроенной отладки WiFiManager
-        // не пишем RESET, потому что при выводе наших сообщений он уже обновляется
+        // Не пишем RESET для выключения цветного вывода, потому что при выводе НАШИХ сообщений он обновляется явным образом
 #if defined(IOP_DEBUG) && defined(COLOR_SERIAL_LOG)
         setDebugOutput(true, 
         String(ColorFormatter::getLevelColor(Level::Debug)) + 
@@ -121,7 +106,6 @@ namespace farm::net
         setDebugOutput(true, String("[DEBUG] [WM]   "));
 #endif
         
-        // Устанавливаем имя хоста, если оно было задано
         if (hostName.length() > 0) 
         {
             WiFi.setHostname(hostName.c_str());
@@ -135,7 +119,7 @@ namespace farm::net
             String currentServer = configManager->getValue<String>(ConfigType::Mqtt, "host");
             int16_t currentPort  = configManager->getValue<int16_t>(ConfigType::Mqtt, "port");
             
-            // Устанавливаем текущие значения в параметры
+            // Устанавливаем текущие значения для их отображения в config portal
             mqttServerParam.setValue(currentServer.c_str(), MQTT_SERVER_PARAM_LENGTH);
             mqttPortParam.setValue(String(currentPort).c_str(), MQTT_PORT_PARAM_LENGTH);
         }
@@ -176,13 +160,10 @@ namespace farm::net
     // Поддержание WiFi соединения - вызывать в цикле loop()
     void MyWiFiManager::maintainConnection()
     {
-        // Обработка процессов WiFiManager в неблокирующем режиме
         wifiManager.process();
         
-        // Обработка активного портала конфигурации
         if (portalActive) 
         {
-            // Если подключение установлено через портал
             if (WiFi.status() == WL_CONNECTED) 
             {
                 logger->log(Level::Farm, 
@@ -200,7 +181,6 @@ namespace farm::net
                 }
                 
                 digitalWrite(pins::LED_PIN, LOW);
-                // Сбрасываем флаги и счетчики
                 portalActive      = false;
                 reconnectAttempts = 0;
             }
@@ -214,7 +194,6 @@ namespace farm::net
         {
             lastCheckTime = currentMillis;
             
-            // Проверка наличия соединения
             if (WiFi.status() != WL_CONNECTED) 
             {
                 // Первая потеря соединения
@@ -222,7 +201,6 @@ namespace farm::net
                     logger->log(Level::Warning, "[WiFi] Соединение потеряно");
                 }
                 
-                // Не пытаемся переподключаться слишком часто
                 if (currentMillis - lastReconnectTime >= RECONNECT_RETRY_INTERVAL) {
                     lastReconnectTime = currentMillis;
                     reconnectAttempts++;
@@ -231,14 +209,13 @@ namespace farm::net
                               "[WiFi] Попытка переподключения %d из %d", 
                               reconnectAttempts, MAX_RECONNECT_ATTEMPTS);
                     
-                    // После достижения максимального числа попыток запускаем портал
+                    // После достижения максимального числа попыток переподключения запускаем портал
                     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) 
                     {
                         logger->log(Level::Warning, 
                                   "[WiFi] Не удалось переподключиться после %d попыток, запуск Config Portal", 
                                   reconnectAttempts);
                         
-                        // Запускаем портал конфигурации
                         portalActive = true;
                         digitalWrite(pins::LED_PIN, HIGH);
                         wifiManager.startConfigPortal(
@@ -246,7 +223,6 @@ namespace farm::net
                             apPassword.length() > 0 ? apPassword.c_str() : nullptr
                         );
                         
-                        // Сбрасываем счетчик попыток
                         reconnectAttempts = 0;
                     }
                     else 
@@ -283,7 +259,6 @@ namespace farm::net
                   enable ? "включен" : "отключен", prefix.c_str());
     }
 
-    // Получение IP-адреса
     String MyWiFiManager::getIPAddress() const
     {
         if (isConnected())
@@ -294,19 +269,16 @@ namespace farm::net
         return "";
     }
     
-    // Проверка наличия соединения
     bool MyWiFiManager::isConnected() const
     {
         return WiFi.status() == WL_CONNECTED;
     }
         
-    // Проверка активности портала конфигурации через базовую библиотеку
     bool MyWiFiManager::isConfigPortalActive()
     {
         return wifiManager.getConfigPortalActive();
     }
         
-    // Установка имени и пароля точки доступа
     void MyWiFiManager::setAccessPointCredentials(const String& name, const String& password)
     {
         apName     = name;
@@ -316,7 +288,6 @@ namespace farm::net
                      apName.c_str(), apPassword.c_str());
     }
     
-    // Установка имени хоста
     void MyWiFiManager::setHostName(const String& name)
     {
         hostName = name;
@@ -328,12 +299,10 @@ namespace farm::net
         }
     }
         
-    // Сброс всех настроек WiFi
     bool MyWiFiManager::resetSettings()
     {   
         logger->log(Level::Warning, "[WiFi] Удаление сохраненных учетных данных");
         
-        // Вызываем метод базового класса для сброса настроек
         wifiManager.resetSettings();
         
         return true; 

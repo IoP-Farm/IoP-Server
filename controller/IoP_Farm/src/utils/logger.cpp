@@ -36,7 +36,6 @@ namespace farm::log
     // Реализация ColorFormatter
     String ColorFormatter::format(Level level, const char* message) const
     {
-        // Формируем сообщение с цветом
         return String(getLevelColor(level)) + String(getLevelPrefix(level)) + 
                message + String(constants::COLOR_RESET);
     }
@@ -79,26 +78,22 @@ namespace farm::log
         if (static_cast<int>(level) <= static_cast<int>(constants::MQTT_LOG_MIN_LEVEL))
         {
 #ifdef USE_FREERTOS
-            // Пытаемся захватить мьютекс с таймаутом
             if (logMutex != NULL && xSemaphoreTake(logMutex, portMAX_DELAY) == pdTRUE) 
             {
 #endif
-            // Проверяем размер буфера и удаляем старые сообщения при необходимости
+            // Проверяем размер буфера и удаляем старые сообщения, если он переполнен
             if (logBuffer.size() >= constants::MAX_BUFFER_SIZE)
             {
                 logBuffer.erase(logBuffer.begin());
             }
             
-            // Добавляем сообщение в буфер
             logBuffer.push_back(message);
                 
 #ifdef USE_FREERTOS
-                // Освобождаем мьютекс
                 xSemaphoreGive(logMutex);
             }
 #endif
-                
-            // Отправляем логи, если прошло достаточно времени и MQTT подключен
+        
             processLogs();
         }
     }
@@ -106,13 +101,11 @@ namespace farm::log
     void MQTTLogTransport::flushLogs()
     {
 #ifdef USE_FREERTOS
-        // Пытаемся захватить мьютекс с таймаутом
         if (logMutex == NULL || xSemaphoreTake(logMutex, portMAX_DELAY) != pdTRUE) {
             return;
         }
 #endif
         
-        // Получаем экземпляр MQTTManager через синглтон
         auto mqttManager = farm::net::MQTTManager::getInstance();
         
         // Если буфер пуст или MQTT не настроен или не подключен, выходим
@@ -124,30 +117,25 @@ namespace farm::log
             return;
         }
         
-        // Получаем топик для логов
         String logTopic = "/" + String(mqtt::DEFAULT_DEVICE_ID) + String(mqtt::LOG_SUFFIX);
         
         // Если количество сообщений меньше или равно MAX_PACKET_SIZE, отправляем все сразу
         if (logBuffer.size() <= constants::MAX_PACKET_SIZE)
         {
-            // Объединяем логи в одно сообщение с разделителями
             String combinedLog;
             for (const auto& log : logBuffer) 
             {
                 combinedLog += log + "\n";
             }
             
-            // Отправляем через MQTT
             mqttManager->publishToTopicLoggerVersion(logTopic, combinedLog, mqtt::QOS_1, true);
             
-            // Очищаем буфер после отправки
             logBuffer.clear();
             lastSendTime = millis();
         }
         // Если сообщений больше MAX_PACKET_SIZE, отправляем пакетами
         else
         {
-            // Количество полных пакетов
             size_t numPackets = logBuffer.size() / constants::MAX_PACKET_SIZE;
             
             // Отправляем полные пакеты
@@ -157,13 +145,11 @@ namespace farm::log
                 size_t startIdx = i * constants::MAX_PACKET_SIZE;
                 size_t endIdx = (i + 1) * constants::MAX_PACKET_SIZE;
                 
-                // Формируем пакет из MAX_PACKET_SIZE сообщений
                 for (size_t j = startIdx; j < endIdx; j++)
                 {
                     packetLog += logBuffer[j] + "\n";
                 }
                 
-                // Отправляем через MQTT
                 mqttManager->publishToTopicLoggerVersion(logTopic, packetLog, mqtt::QOS_1, true);
             }
             
@@ -177,34 +163,28 @@ namespace farm::log
                     remainingLog += logBuffer[i] + "\n";
                 }
                 
-                // Отправляем через MQTT
                 mqttManager->publishToTopicLoggerVersion(logTopic, remainingLog, mqtt::QOS_1, true);
             }
             
-            // Очищаем буфер после отправки
             logBuffer.clear();
             lastSendTime = millis();
         }
         
 #ifdef USE_FREERTOS
-        // Освобождаем мьютекс
         xSemaphoreGive(logMutex);
 #endif
     }
     
     void MQTTLogTransport::processLogs()
     {
-        // Получаем экземпляр MQTTManager через синглтон
         auto mqttManager = farm::net::MQTTManager::getInstance();
         
-        // Проверяем, инициализирован ли MQTT
         if (!mqttManager->isMqttInitialized())
         {
             return;
         }
         
 #ifdef USE_FREERTOS
-        // Пытаемся захватить мьютекс с таймаутом
         if (logMutex != NULL && xSemaphoreTake(logMutex, portMAX_DELAY) == pdTRUE) 
         {
 #endif
@@ -219,14 +199,11 @@ namespace farm::log
                 // Освобождаем мьютекс перед вызовом flushLogs, так как он сам захватит мьютекс
                 xSemaphoreGive(logMutex);
 #endif
-                
-            // Отправляем накопленные логи
             flushLogs();
         }
 #ifdef USE_FREERTOS
             else
             {
-                // Освобождаем мьютекс
                 xSemaphoreGive(logMutex);
             }
         }
@@ -237,7 +214,6 @@ namespace farm::log
     Logger::Logger(std::shared_ptr<IMessageFormatter> formatter)
         : level(Level::Info), formatter(std::move(formatter))
     {
-        // Конструктор
     }
 
     void Logger::addTransport(std::shared_ptr<ILogTransport> transport)

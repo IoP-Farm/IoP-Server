@@ -5,32 +5,26 @@
 
 namespace farm::sensors
 {
-    // Конструктор
     FC28::FC28(std::shared_ptr<log::ILogger> logger, uint8_t pin)
-        : pin(pin),
+        : ISensor(),
+          pin(pin),
           dryValue(calibration::FC28_DRY_VALUE),
           wetValue(calibration::FC28_WET_VALUE)
     {
-        // Сохраняем логгер
         this->logger = logger;
         
-        // Устанавливаем параметры сенсора
         setSensorName(names::FC28);
         setMeasurementType(json_keys::SOIL_MOISTURE);
         setUnit(units::PERCENT);
         
-        // Разрешаем считывание и сохранение данных
         shouldBeRead = true;
         shouldBeSaved = true;
         
-        // Инициализируем значение как "нет данных"
         lastMeasurement = calibration::NO_DATA;
     }
     
-    // Инициализация датчика
     bool FC28::initialize()
     {
-        // Проверяем, что пин в допустимом диапазоне
         if (pin == calibration::UNINITIALIZED_PIN)
         {
             logger->log(Level::Error, 
@@ -38,7 +32,6 @@ namespace farm::sensors
             return false;
         }
         
-        // Настраиваем пин как вход
         pinMode(pin, INPUT);
         
         initialized = true;
@@ -74,7 +67,6 @@ namespace farm::sensors
         int constrained = constrain(rawValue, wetValue, dryValue);
         float moisturePercent = utils::MyMap<int, float>(constrained, dryValue, wetValue, 0.0f, 100.0f);
 
-        // Сохраняем результат
         lastMeasurement = moisturePercent;
         
         return moisturePercent;
@@ -86,7 +78,6 @@ namespace farm::sensors
         return analogRead(pin);
     }
     
-    // Установить калибровочные значения
     void FC28::setCalibration(int dryValue, int wetValue)
     {
         // Проверяем корректность значений (сухое значение должно быть больше влажного)

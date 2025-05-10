@@ -5,6 +5,7 @@
 namespace farm::sensors
 {
     // Инициализируем статический указатель
+    // Необходим для работы с прерыванием
     YFS401* YFS401::s_instance = nullptr;
     
     // Обработчик прерывания для счета импульсов
@@ -20,22 +21,21 @@ namespace farm::sensors
     }
 
     // Статический метод для получения экземпляра
+    // Не паттерн Singleton, используется лишь для работы с прерыванием
     YFS401* YFS401::getInstance()
     {
         return s_instance;
     }
 
-    // Конструктор
     YFS401::YFS401(std::shared_ptr<log::ILogger> logger, uint8_t pin)
-        : pin(pin),
+        : ISensor(),
+          pin(pin),
           calibrationFactor(calibration::YFS401_CALIBRATION_FACTOR),
           pulseCount(0),
           lastUpdateTime(0) 
     {
-        // Инициализация базового класса
         this->logger = logger;
         
-        // Устанавливаем параметры датчика
         setSensorName(farm::config::sensors::names::YFS401);
         setMeasurementType(farm::config::sensors::json_keys::WATER_FLOW);
         setUnit(farm::config::sensors::units::LITERS);
@@ -48,10 +48,8 @@ namespace farm::sensors
         s_instance = this;
     }
     
-    // Деструктор
     YFS401::~YFS401()
     {
-        // Отключаем прерывание при уничтожении объекта
         if (initialized && pin != farm::config::sensors::calibration::UNINITIALIZED_PIN) 
         {
             detachInterrupt(digitalPinToInterrupt(pin));
@@ -61,14 +59,12 @@ namespace farm::sensors
 
         enable(false);
         
-        // Очищаем статический указатель
         if (s_instance == this)
         {
             s_instance = nullptr;
         }
     }
 
-    // Инициализация датчика
     bool YFS401::initialize()
     {
         if (pin == farm::config::sensors::calibration::UNINITIALIZED_PIN) 
@@ -78,17 +74,14 @@ namespace farm::sensors
             return false;
         }
 
-        // Настраиваем пин как вход
         pinMode(pin, INPUT);
         
-        // Сбрасываем счетчик при инициализации
         resetCounter();
 
         initialized = true;
         return true;
     }
 
-    // Сбросить счетчик
     void YFS401::resetCounter()
     {
         pulseCount = 0;
@@ -96,7 +89,6 @@ namespace farm::sensors
         lastMeasurement = 0.0f;
     }
 
-    // Установить коэффициент калибровки
     void YFS401::setCalibrationFactor(float factor)
     {
         if (factor > 0) 
@@ -113,11 +105,9 @@ namespace farm::sensors
     }
 
     // Зарегистрировать импульс (вызывается из ISR)
-    // TODO: убрать логирование в ISR
     void YFS401::pulse()
     {
         pulseCount++;
-        logger->log(farm::log::Level::Debug, "[YFS401] Зарегистрирован импульс %lu", pulseCount);
     }
 
     // Считать объем в литрах
@@ -130,10 +120,8 @@ namespace farm::sensors
             return calibration::SENSOR_ERROR_VALUE;
         }
         
-        // Обновляем последнее измеренное значение (общий объем воды в литрах)
         lastMeasurement = getTotalVolume();
         
-        // Добавляем лог с текущим значением и количеством импульсов
         logger->log(farm::log::Level::Debug, 
                   "[YFS401] Текущий объем: %.3f л (импульсов: %lu)",
                   lastMeasurement, pulseCount);
@@ -141,21 +129,27 @@ namespace farm::sensors
         return lastMeasurement;
     }
 
-    // Получить общий объем воды в литрах с момента последнего сброса
+    // Получить общий объем воды в литрах с момента последнего сброса счетчика
     float YFS401::getTotalVolume() const
     {
         if (!initialized) 
         {
-            logger->log(farm::log::Level::Error, 
-                      "[YFS401] Попытка получения объема с неинициализированного датчика");
+            if (logger)
+            {
+                logger->log(farm::log::Level::Error, 
+                          "[YFS401] Попытка получения объема с неинициализированного датчика");
+            }
             return calibration::SENSOR_ERROR_VALUE;
         }
         
         // Объем = количество импульсов / калибровочный коэффициент (импульсы на литр)
         if (calibrationFactor <= 0) 
-        {
-            logger->log(farm::log::Level::Error, 
-                      "[YFS401] Некорректный коэффициент калибровки: %.2f", calibrationFactor);
+        {   
+            if (logger)
+            {
+                logger->log(farm::log::Level::Error, 
+                          "[YFS401] Некорректный коэффициент калибровки: %.2f", calibrationFactor);
+            }
             return 0.0f;
         }
         
@@ -181,34 +175,35 @@ namespace farm::sensors
         return true;
     }
     
-    // Включить или выключить датчик
     bool YFS401::enable(bool enable)
     {
         if (!initialized)
         {
-            logger->log(farm::log::Level::Error, 
-                      "[YFS401] Попытка включения неинициализированного датчика");
+            if (logger)
+            {
+                logger->log(farm::log::Level::Error, 
+                          "[YFS401] Попытка включения неинициализированного датчика");
+            }
             return false;
         }
         
         if (enable) 
         {
-            // Сбрасываем счетчик при включении датчика
             resetCounter();
             
-            // Включаем прерывание
             attachInterrupt(digitalPinToInterrupt(pin), flowPulseCounter, RISING);
             
-            logger->log(farm::log::Level::Debug,
-                        "[YFS401] Датчик включен");
+            if (logger)
+            {
+                logger->log(farm::log::Level::Debug,
+                            "[YFS401] Датчик включен");
+            }
             return true;
         } 
         else 
         {
-            // Выключаем прерывание
             detachInterrupt(digitalPinToInterrupt(pin));
             
-            // Сохраняем финальное значение для удобства
             float finalVolume = getTotalVolume();
             
             logger->log(farm::log::Level::Debug, 

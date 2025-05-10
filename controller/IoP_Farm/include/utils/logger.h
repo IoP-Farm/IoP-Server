@@ -51,7 +51,6 @@ namespace farm::log
         // Принудительная отправка логов
         void flushLogs();
         
-        // Периодическая проверка и отправка логов (вызывать в loop)
         void processLogs();
     };
 

@@ -62,29 +62,22 @@ namespace farm::sensors
     class DS18B20 : public ISensor
     {
     private:
-        // Пин, к которому подключен датчик
         uint8_t pin;
         
         // Адрес устройства (для нескольких датчиков на одной шине)
         uint8_t deviceAddress[8];
         
-        // Ресурсы для работы с датчиком
         std::shared_ptr<DS18B20Resources> resources;
         
     public:
-        // Конструктор
-        DS18B20(std::shared_ptr<log::ILogger> logger, uint8_t pin);
-        
-        // Деструктор
+        DS18B20(std::shared_ptr<log::ILogger> logger, uint8_t pin);     
         ~DS18B20();
         
-        // Инициализация датчика
         bool initialize() override;
         
-        // Считать температуру
+        // Считать температуру в градусах Цельсия
         float read() override;
         
-        // Установить адрес устройства (для нескольких датчиков на одной шине)
         void setDeviceAddress(const uint8_t* address);
     };
 } 

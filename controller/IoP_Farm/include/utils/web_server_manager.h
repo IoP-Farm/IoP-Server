@@ -46,33 +46,26 @@ namespace farm::net
         // Приватный конструктор (паттерн Синглтон)
         explicit WebServerManager(std::shared_ptr<farm::log::ILogger> logger = nullptr);
         
-        // Статический экземпляр
         static std::shared_ptr<WebServerManager> instance;
         
-        // Логгер
         std::shared_ptr<farm::log::ILogger> logger;
         
-        // Сервер
         WebServer server;
         
-        // Флаг инициализации
         bool isInitialized = false;
         
-        // Данные для HTTP-аутентификации
-        String username = "admin";    // Имя пользователя по умолчанию (изменяется в passwords.json)
-        String password = "admin";    // Пароль по умолчанию
-        bool authEnabled = false;      // Флаг включения аутентификации
+        // Данные для HTTP-аутентификации по умолчанию, изменяется в passwords.json
+        String username = "admin";    
+        String password = "admin";
+        bool authEnabled = false;      
         
-        // Настройка обработчиков запросов
         void setupHandlers();
         
         // HTML шаблон для страницы обновления
         const char* getUpdateHtml();
         
-        // Получить MIME-тип как строку
         const char* getMimeStr(Mime mime);
         
-        // Проверка аутентификации
         bool checkAuth();
         
         // Обработчики HTTP запросов
@@ -82,17 +75,14 @@ namespace farm::net
         void handleNotFound();
         
     public:
-        // Получение экземпляра синглтона
         static std::shared_ptr<WebServerManager> getInstance(std::shared_ptr<farm::log::ILogger> logger = nullptr);
         
-        // Запрещаем копирование и присваивание
+        // Запрещаем копирование и присваивание (паттерн Синглтон)
         WebServerManager(const WebServerManager&) = delete;
         WebServerManager& operator=(const WebServerManager&) = delete;
         
-        // Деструктор
         ~WebServerManager();
         
-        // Инициализация веб-сервера
         bool initialize();
         
         // Обработка запросов (вызывается в loop)

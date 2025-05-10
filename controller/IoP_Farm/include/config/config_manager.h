@@ -17,17 +17,14 @@
 
 namespace farm::config
 {
-    // Менеджер конфигурации - синглтон с использованием std::shared_ptr
+    // Менеджер конфигурации - синглтон
     class ConfigManager
     {
     private:
         // Приватный конструктор (паттерн Синглтон)
         explicit ConfigManager(std::shared_ptr<farm::log::ILogger> logger = nullptr);
-        
-        // Статический экземпляр как shared_ptr
         static std::shared_ptr<ConfigManager> instance;
         
-        // Логгер
         std::shared_ptr<farm::log::ILogger> logger;
         
         // JSON документы для разных типов конфигураций
@@ -47,42 +44,48 @@ namespace farm::config
         JsonDocument& getConfigDocument(ConfigType type);
         const JsonDocument& getConfigDocument(ConfigType type) const;
 
-        // 
+        // Очистка всех JSON объектов без сохранения в энергонезависимую память
+        bool clearAllConfigsWithoutSaving();
+
     public:
-        // Получение экземпляра синглтона как shared_ptr
         static std::shared_ptr<ConfigManager> getInstance(std::shared_ptr<farm::log::ILogger> logger = nullptr);
-        
-        // Запрещаем копирование и присваивание
         ConfigManager(const ConfigManager&) = delete;
         ConfigManager& operator=(const ConfigManager&) = delete;
         
-        // Деструктор
         ~ConfigManager();
         
-        // Инициализация SPIFFS
         bool initialize();
         
-        // Методы для работы с файлами конфигурации
-        bool loadConfig(ConfigType type);
-        bool saveConfig(ConfigType type);
+        bool loadConfig(ConfigType type);  // Из памяти в JSON документ
+        bool saveConfig(ConfigType type);  // Из JSON документа в память
         
-        // Загрузка/сохранение всех конфигураций
         bool loadAllConfigs();
         bool saveAllConfigs();
 
-        // Очистка конфигурации указанного типа
         bool clearConfig(ConfigType type);
         bool clearAllConfigs();
 
-        // Удаление конфигурации указанного типа
         bool deleteConfig(ConfigType type);
         bool deleteAllConfigs();
 
-        // Загрузка дефолтной конфигурации
         bool loadDefaultConfig(ConfigType type);
         bool loadAllDefaultConfigs();
+        
+        bool hasKey(ConfigType type, const char* key) const;
+        
+        // Вывод текущей конфигурации в Serial (!!!) для отладки
+        void printConfig(ConfigType type) const;
+        
+        // Получение JSON строки по типу
+        String getConfigJson(ConfigType type) const;
+        
+        // Обновление конфигурации из JSON строки без сохранения в энергонезависимую память
+        bool updateFromJson(ConfigType type, const String& jsonString);
 
-        // Шаблонный метод для получения значения
+        // Вывод информации о файловой системе SPIFFS через Serial (!!!)
+        void printSpiffsInfo() const;
+
+        // Шаблонный метод для получения значения из JSON, необходимо определять в заголовочном файле
         template<typename T>
         T getValue(ConfigType type, const char* key) const
         {
@@ -96,27 +99,12 @@ namespace farm::config
             return doc[key].as<T>();
         }
         
-        // Шаблонный метод для установки значения
+        // Шаблонный метод для установки значения в JSON, необходимо определять в заголовочном файле
         template<typename T>
         void setValue(ConfigType type, const char* key, const T& value)
         {
             auto& doc = getConfigDocument(type);
             doc[key] = value;
         }
-        
-        // Проверка существования ключа
-        bool hasKey(ConfigType type, const char* key) const;
-        
-        // Вывод текущей конфигурации в Serial для отладки
-        void printConfig(ConfigType type) const;
-        
-        // Получение JSON строки для указанного типа конфигурации
-        String getConfigJson(ConfigType type) const;
-        
-        // Обновление конфигурации из JSON строки
-        bool updateFromJson(ConfigType type, const String& jsonString);
-
-        // Вывод информации о файловой системе SPIFFS через Serial
-        void printSpiffsInfo() const;
     };
 }

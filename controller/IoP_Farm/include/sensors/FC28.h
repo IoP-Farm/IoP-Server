@@ -56,18 +56,14 @@ namespace farm::sensors
     class FC28 : public ISensor
     {
     private:
-        // Пин, к которому подключен датчик
         uint8_t pin;
         
-        // Калибровочные значения
         int dryValue;    // Значение АЦП для сухой почвы
         int wetValue;    // Значение АЦП для влажной почвы
         
     public:
-        // Конструктор
         FC28(std::shared_ptr<log::ILogger> logger, uint8_t pin);
-        
-        // Инициализация датчика
+
         bool initialize() override;
         
         // Считать влажность почвы в процентах (0-100%)
@@ -76,7 +72,6 @@ namespace farm::sensors
         // Получить текущее сырое значение АЦП
         int getRawValue() const;
         
-        // Установить калибровочные значения
         void setCalibration(int dryValue, int wetValue);
     };
 } 

@@ -4,20 +4,18 @@
 
 namespace farm::sensors
 {
-    // Используем пространства имен для удобства
     using namespace farm::log;
     using namespace farm::config;
     using namespace farm::config::sensors;
     
-    // Инициализация статического экземпляра
+    // Singleton: гарантирует единственный SensorsManager на всю систему
     std::shared_ptr<SensorsManager> SensorsManager::instance = nullptr;
     
-    // Конструктор
     SensorsManager::SensorsManager(std::shared_ptr<log::ILogger> logger)
         : lastReadTime(0),
-          readInterval(timing::DEFAULT_READ_INTERVAL) // Используем константу из файла constants.h
+          readInterval(timing::DEFAULT_READ_INTERVAL),
+          enabled(true) // Датчики включены при старте для немедленного сбора данных
     {
-        // Если логгер не передан, создаем новый с помощью фабрики
         if (logger == nullptr) 
         {
             this->logger = LoggerFactory::createSerialLogger(Level::Info);
@@ -27,14 +25,13 @@ namespace farm::sensors
             this->logger = logger;
         }
         
-        // Получаем экземпляр ConfigManager
         configManager = ConfigManager::getInstance(this->logger);
         
         // Получаем экземпляр MQTTManager для публикации данных
-        mqttManager = farm::net::MQTTManager::getInstance(this->logger);
+        mqttManager = net::MQTTManager::getInstance(this->logger);
     }
     
-    // Получение экземпляра синглтона
+    // Получение экземпляра синглтона (гарантирует единственный SensorsManager на всю систему)
     std::shared_ptr<SensorsManager> SensorsManager::getInstance(std::shared_ptr<ILogger> logger)
     {
         if (instance == nullptr) 
@@ -44,16 +41,13 @@ namespace farm::sensors
         }
         return instance;
     }
-    
-    // Деструктор
+
     SensorsManager::~SensorsManager()
     {
         logger->log(Level::Debug, "[Sensors] Освобождение ресурсов SensorsManager");
         
-        // Очищаем датчики
         clearSensors();
         
-        // Освобождаем статические ресурсы
         DHT22Common::releaseAll();
         DS18B20Common::releaseAll();
         
@@ -61,17 +55,14 @@ namespace farm::sensors
     }
 
     
-    // Инициализация всех датчиков
+    // Инициализация всех датчиков, если пины настроены
     bool SensorsManager::initialize()
     {
         logger->log(Level::Farm, "[Sensors] Инициализация датчиков");
         
-        // Очищаем существующие датчики
         clearSensors();
         
         bool allInitialized = true;
-        
-        // Создаем и инициализируем датчики если пины настроены
         
         int totalChecked = 0;
 
@@ -161,14 +152,12 @@ namespace farm::sensors
         
         for (auto& [name, sensor] : sensors) 
         {
-            // Проверяем, должен ли этот датчик считывать данные
             if (!sensor->shouldBeRead) {
                 continue;
             }
             
             totalReadable++;
             
-            // Считываем показания
             if (sensor->read() != calibration::SENSOR_ERROR_VALUE) 
             {
                 logger->log(Level::Info, 
@@ -205,7 +194,6 @@ namespace farm::sensors
         
         for (auto& [name, sensor] : sensors) 
         {
-            // Проверяем, должен ли этот датчик сохранять данные
             if (!sensor->shouldBeSaved) {
                 continue;
             }
@@ -233,9 +221,13 @@ namespace farm::sensors
         return allSuccess;
     }
     
-    // Метод для периодического выполнения в loop
+    // Основной цикл опроса датчиков и публикации данных, вызывается в main.cpp
     bool SensorsManager::loop()
     {
+        if (!enabled) {
+            return true;
+        }
+
         // Проверяем, прошло ли достаточно времени для нового считывания
         unsigned long currentTime = millis();
         if (currentTime - lastReadTime >= readInterval) 
@@ -244,13 +236,8 @@ namespace farm::sensors
             
             logger->log(Level::Farm, "[Sensors] Запуск цикла считывания данных");
             
-            // Считываем данные со всех датчиков
             readAllSensors();
-            
-            // Сохраняем измеренные значения в оперативную память (Json)
             saveAllMeasurements();
-
-            // Сохраняем конфигурацию в SPIFFS
             configManager->saveConfig(ConfigType::Data);
             
             // Если подключены к MQTT, публикуем данные
@@ -306,13 +293,9 @@ namespace farm::sensors
     {
         return sensors[sensorName]->getLastMeasurement();
     } 
-
-
-
-    // Добавить датчик
+    
     bool SensorsManager::addSensor(const String& sensorName, std::shared_ptr<ISensor> sensor)
     {
-        // Проверяем, есть ли уже датчик с таким именем
         if (sensors.find(sensorName) != sensors.end()) 
         {
             logger->log(Level::Warning, 
@@ -321,8 +304,6 @@ namespace farm::sensors
                       sensor->getMeasurementType().c_str());
             return false;
         }
-        
-        // Проверяем инициализацию и инициализируем при необходимости
         if (!sensor->initialized) 
         {
             if (!sensor->initialize()) 
@@ -334,18 +315,14 @@ namespace farm::sensors
                 return false;
             }
         }
-        
-        // Добавляем датчик в map
         sensors[sensorName] = sensor;
         logger->log(Level::Info, 
                   "[Sensors] Датчик %s (%s) добавлен в SensorsManager", 
                   sensorName.c_str(), 
                   sensor->getMeasurementType().c_str());
-        
         return true;
     }
 
-    // Установка интервала считывания
     void SensorsManager::setReadInterval(unsigned long interval)
     {
         readInterval = interval;
@@ -354,10 +331,8 @@ namespace farm::sensors
                   interval);
     }
 
-    // Удалить датчик
     bool SensorsManager::removeSensor(const String& sensorName)
     {
-        // Проверяем, существует ли датчик
         auto it = sensors.find(sensorName);
         if (it == sensors.end()) 
         {
@@ -366,17 +341,13 @@ namespace farm::sensors
                       sensorName.c_str());
             return false;
         }
-        
-        // Удаляем датчик из map
         sensors.erase(it);
         logger->log(Level::Debug, 
                   "[Sensors] Датчик %s удален", 
                   sensorName.c_str());
-        
         return true;
     }
     
-    // Получить датчик по имени
     std::shared_ptr<ISensor> SensorsManager::getSensor(const String& sensorName)
     {
         auto it = sensors.find(sensorName);
@@ -384,30 +355,43 @@ namespace farm::sensors
         {
             return it->second;
         }
-        
-        logger->log(Level::Warning, 
-                  "[Sensors] Датчик с именем %s не найден", 
-                  sensorName.c_str());
-        
+        if (logger)
+        {
+            logger->log(Level::Warning, 
+                      "[Sensors] Датчик с именем %s не найден", 
+                      sensorName.c_str());
+        }
         return nullptr;
     }
     
-    // Проверить, есть ли такой датчик
     bool SensorsManager::hasSensor(const String& sensorName) const
     {
         return sensors.find(sensorName) != sensors.end();
     }
     
-    // Получить количество датчиков
     size_t SensorsManager::getSensorCount() const
     {
         return sensors.size();
     }
     
-    // Очистить все датчики
     void SensorsManager::clearSensors()
     {
         sensors.clear();
         logger->log(Level::Debug, "[Sensors] Все датчики удалены");
+    }
+
+    void SensorsManager::sensorsEnable(bool enable)
+    {
+        if (enabled == enable) {
+            return; // Если состояние не изменилось, ничего не делаем
+        }
+
+        enabled = enable;
+        
+        if (enable) {
+            logger->log(Level::Farm, "[Sensors] Датчики включены");
+        } else {
+            logger->log(Level::Farm, "[Sensors] Датчики выключены");
+        }
     }
 } 

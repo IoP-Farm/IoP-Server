@@ -51,11 +51,9 @@ namespace farm::net
             default:           return "text/plain";
         }
     }
-    
-    // Инициализация веб-сервера
+
     bool WebServerManager::initialize()
     {
-        // Получаем экземпляр WiFiManager
         auto wifiManager = MyWiFiManager::getInstance();
 
         if (!wifiManager->isConnected())
@@ -72,22 +70,18 @@ namespace farm::net
 
         // Загрузка учетных данных из конфигурации
         auto configManager = farm::config::ConfigManager::getInstance(logger);
-        
-        // Проверяем существование конфигурации паролей
+       
         if (configManager->hasKey(farm::config::ConfigType::Passwords, "WebServerUser") && 
             configManager->hasKey(farm::config::ConfigType::Passwords, "WebServerPass")) 
         {
-            // Загружаем учетные данные
             username = configManager->getValue<String>(farm::config::ConfigType::Passwords, "WebServerUser");
             password = configManager->getValue<String>(farm::config::ConfigType::Passwords, "WebServerPass");
         }
         else 
         {
-            // Используем значения по умолчанию
             logger->log(farm::log::Level::Warning, "[WebServer] Не найдены учетные данные для веб-сервера в конфигурации");
         }
         
-        // Настройка обработчиков
         setupHandlers();
         
         // Запуск сервера
@@ -100,7 +94,6 @@ namespace farm::net
         return true;
     }
     
-    // Настройка обработчиков запросов
     void WebServerManager::setupHandlers()
     {
         // Главная страница с формой для загрузки прошивки
@@ -128,26 +121,21 @@ namespace farm::net
                 }
             },
             [this]() {
-                // Обработка загрузки файла
-                // Для загрузки файла аутентификация проверяется ранее
+                // *Аутентификация была проверена ранее
                 this->handleDoUpdate();
             }
         );
         
-        // Обработчик для неизвестных запросов
         server.onNotFound([this]() { this->handleNotFound(); });
     }
     
     // Обработка запросов (вызывается в loop)
     void WebServerManager::handleClient()
     {
-        // Получаем экземпляр WiFiManager
         auto wifiManager = MyWiFiManager::getInstance();
 
-        // Проверяем подключение к WiFi перед обработкой запросов
         if (wifiManager->isConnected())
         {
-            // Проверяем, что веб-сервер инициализирован, если нет - инициализируем
             if (!isInitialized) 
             {
                 if (!initialize()) 
@@ -172,7 +160,6 @@ namespace farm::net
     // Обработчик для корневого URL
     void WebServerManager::handleRoot()
     {
-        // Проверяем аутентификацию
         if (!checkAuth()) return;
         
         // Перенаправляем на страницу обновления
@@ -183,7 +170,6 @@ namespace farm::net
     // Обработчик для страницы обновления
     void WebServerManager::handleUpdate()
     {
-        // Проверяем аутентификацию
         if (!checkAuth()) return;
         
         server.send(static_cast<int>(HttpStatus::OK), getMimeStr(Mime::HTML), getUpdateHtml());
@@ -192,7 +178,6 @@ namespace farm::net
     // Обработчик для процесса обновления
     void WebServerManager::handleDoUpdate()
     {
-        // Проверяем аутентификацию
         if (!checkAuth()) return;
         
         HTTPUpload& upload = server.upload();
@@ -201,7 +186,7 @@ namespace farm::net
         {
             logger->log(farm::log::Level::Info, "[WebServer] Обновление: начало приема файла '%s'", upload.filename.c_str());
             
-            // Запускаем процесс обновления
+            // Запуск процесса обновления
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) 
             {
                 logger->log(farm::log::Level::Error, "[WebServer] недостаточно места для обновления");
@@ -219,7 +204,6 @@ namespace farm::net
         } 
         else if (upload.status == UPLOAD_FILE_END) 
         {
-            // Завершаем процесс обновления
             if (Update.end(true)) 
             {
                 logger->log(farm::log::Level::Info, 
@@ -237,10 +221,9 @@ namespace farm::net
     // Обработчик для неизвестных запросов
     void WebServerManager::handleNotFound()
     {
-        // Проверяем аутентификацию
         if (!checkAuth()) return;
         
-        // Перенаправляем на страницу обновления
+        // Просто перенаправляем на страницу обновления
         server.sendHeader("Location", "/update", true);
         server.send(static_cast<int>(HttpStatus::FOUND), getMimeStr(Mime::PLAIN), "");
     }
@@ -255,7 +238,6 @@ namespace farm::net
         return username; 
     }
     
-    // Проверка аутентификации пользователя
     bool WebServerManager::checkAuth()
     {
         if (!authEnabled)
@@ -271,14 +253,13 @@ namespace farm::net
         return true;  // Аутентификация успешна
     }
     
-    // Установка учетных данных
     void WebServerManager::setCredentials(const String& user, const String& pass)
     {
         username = user;
         password = pass;
         logger->log(farm::log::Level::Info, "[WebServer] Установлены новые учетные данные для веб-сервера");
         
-        // Сохраняем в конфигурацию
+        // Сохраняем в configManager
         auto configManager = farm::config::ConfigManager::getInstance(logger);
         configManager->setValue(farm::config::ConfigType::Passwords, "WebServerUser", user);
         configManager->setValue(farm::config::ConfigType::Passwords, "WebServerPass", pass);
@@ -293,7 +274,7 @@ namespace farm::net
                   enable ? "включена" : "отключена");
     }
 
-        // HTML шаблон для страницы обновления
+    // HTML шаблон для страницы обновления
     const char* WebServerManager::getUpdateHtml()
     {
         static const char updateHtml[] PROGMEM = R"rawliteral(

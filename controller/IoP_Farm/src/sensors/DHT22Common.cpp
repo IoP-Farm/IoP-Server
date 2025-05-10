@@ -5,10 +5,8 @@ namespace farm::sensors
     // Инициализация статической переменной
     std::map<int8_t, std::shared_ptr<DHT>> DHT22Common::s_dhtInstances;
     
-    // Получение экземпляра DHT по пину
     std::shared_ptr<DHT> DHT22Common::getInstance(int8_t pin, std::shared_ptr<ILogger> logger)
     {
-        // Проверка на неинициализированный пин
         if (pin == calibration::UNINITIALIZED_PIN)
         {
             logger->log(Level::Error, 
@@ -22,7 +20,6 @@ namespace farm::sensors
             return it->second;
         }
         
-        // Создаем новый объект
         try {
             std::shared_ptr<DHT> dht = std::make_shared<DHT>(pin, DHT22);
             dht->begin();
@@ -36,7 +33,6 @@ namespace farm::sensors
         }
     }
     
-    // Освобождение экземпляра для указанного пина
     void DHT22Common::releaseInstance(int8_t pin)
     {
         auto it = s_dhtInstances.find(pin);
@@ -45,7 +41,6 @@ namespace farm::sensors
         }
     }
     
-    // Освобождение всех экземпляров
     void DHT22Common::releaseAll()
     {
         s_dhtInstances.clear();

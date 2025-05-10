@@ -46,18 +46,14 @@ namespace farm::sensors
     class KY018 : public ISensor
     {
     private:
-        // Пин, к которому подключен датчик
         uint8_t pin;
         
-        // Калибровочные значения
         int darkValue;   // Значение АЦП в темноте
         int lightValue;  // Значение АЦП при ярком свете
         
     public:
-        // Конструктор KY018
         KY018(std::shared_ptr<log::ILogger> logger, uint8_t pin);
         
-        // Инициализация датчика
         bool initialize() override;
         
         // Считать уровень освещенности в процентах (0-100%)
@@ -66,7 +62,6 @@ namespace farm::sensors
         // Получить текущее сырое значение АЦП
         int getRawValue() const;
         
-        // Установить калибровочные значения
         void setCalibration(int darkValue, int lightValue);
     };
 } 

@@ -6,22 +6,19 @@
 
 namespace farm::config
 {
-    // Использование сокращений для более компактного кода
     using farm::log::Level;
     using farm::log::LoggerFactory;
-    
-    // Инициализация статического экземпляра
+
+    // Инициализация статического экземпляра (паттерн Singleton)
     std::shared_ptr<ConfigManager> ConfigManager::instance = nullptr;
 
-    // Конструктор
     ConfigManager::ConfigManager(std::shared_ptr<farm::log::ILogger> logger)
-        : dataConfig(),     // В ArduinoJson 7 не нужно указывать размер
-          systemConfig(),   // В ArduinoJson 7 не нужно указывать размер
-          commandConfig(),  // В ArduinoJson 7 не нужно указывать размер
-          mqttConfig(),     // Конфигурация MQTT
-          passwordsConfig() // Конфигурация паролей
+        : dataConfig(),     // В ArduinoJson 7 не нужно указывать размер JSON-документа
+          systemConfig(),   // В ArduinoJson 7 не нужно указывать размер JSON-документа
+          commandConfig(),  // В ArduinoJson 7 не нужно указывать размер JSON-документа
+          mqttConfig(),     // В ArduinoJson 7 не нужно указывать размер JSON-документа
+          passwordsConfig() // В ArduinoJson 7 не нужно указывать размер JSON-документа
     {
-        // Если логгер не передан, создаем новый с помощью фабрики
         if (!logger) 
         {
             this->logger = LoggerFactory::createSerialLogger(Level::Info);
@@ -32,7 +29,7 @@ namespace farm::config
         }
     }
 
-    // Получение экземпляра синглтона
+    // Получение экземпляра (паттерн Singleton)
     std::shared_ptr<ConfigManager> ConfigManager::getInstance(std::shared_ptr<farm::log::ILogger> logger)
     {
         if (instance == nullptr) 
@@ -47,7 +44,6 @@ namespace farm::config
     {
         logger->log(Level::Debug, "[Config] Освобождение памяти ConfigManager");
 
-        // Освобождаем все JSON документы
         dataConfig.clear();
         systemConfig.clear();
         commandConfig.clear();
@@ -55,7 +51,6 @@ namespace farm::config
         passwordsConfig.clear();
     }
 
-    // Инициализация SPIFFS
     bool ConfigManager::initialize()
     {
         logger->log(Level::Farm, "[Config] Инициализация SPIFFS");
@@ -65,7 +60,6 @@ namespace farm::config
             return false;
         }
         
-        // Проверяем наличие всех необходимых файлов
         bool allFilesExist = true;
         
         // Проверка дефолтных файлов конфигурации
@@ -112,24 +106,44 @@ namespace farm::config
             return false;
         }
 
+        // Вызывается при самой первой прошивке ESP32, далее по желанию 
+        // (необходимо выбрать соответствующую environment)
+        // Загружаются настройки по умолчанию
+#ifdef LOAD_DEFAULT_CONFIGS
         logger->log(Level::Info, "[Config] Загрузка стандартных настроек");
 
-        // Очистка всех конфигураций после перезагрузки устройства
         clearAllConfigs();
-
-        // Загрузка всех дефолтных конфигураций
         loadAllDefaultConfigs();
+#else
+        // Загружаются последние сохранённые настройки
+        logger->log(Level::Info, "[Config] Загрузка последних конфигураций из SPIFFS");
+
+        clearAllConfigsWithoutSaving();
+        loadAllConfigs();
+#endif
 
         return true;
     }
 
     bool ConfigManager::clearConfig(ConfigType type)
     {
-        // Очистка конфигурации указанного типа
         auto& doc = getConfigDocument(type);
         doc.clear();
         logger->log(Level::Debug, "[Config] %s очищен", getConfigPath(type));
         return saveConfig(type);
+    }
+
+    bool ConfigManager::clearAllConfigsWithoutSaving()
+    {
+        bool success = true;
+
+        dataConfig.clear(); 
+        systemConfig.clear();
+        commandConfig.clear();
+        mqttConfig.clear();
+        passwordsConfig.clear();
+
+        return success;
     }
 
     bool ConfigManager::clearAllConfigs()
@@ -216,7 +230,6 @@ namespace farm::config
         return true;
     }
 
-    // Получение пути к файлу конфигурации в зависимости от типа
     const char* ConfigManager::getConfigPath(ConfigType type) const
     {
         switch (type)
@@ -243,7 +256,6 @@ namespace farm::config
         }
     }
     
-    // Получение пути к файлу дефолтной конфигурации в зависимости от типа
     const char* ConfigManager::getDefaultConfigPath(ConfigType type) const
     {
         switch (type)
@@ -270,7 +282,7 @@ namespace farm::config
         }
     }
 
-    // Получение JSON документа для указанного типа
+    // Получение изменяемого JSON документа для указанного типа
     // TODO: возвращаемое значение по дефолту нехорошее, но не критично, т.к. всегда передаем валидный тип
     JsonDocument& ConfigManager::getConfigDocument(ConfigType type)
     {
@@ -294,11 +306,11 @@ namespace farm::config
             default:
                 logger->log(farm::log::Level::Error, 
                           "[Config] Запрошен документ для неизвестного типа конфигурации");
-                return dataConfig; // Возвращаем документ по умолчанию
+                return dataConfig; 
         }
     }
 
-    // Получение константной ссылки на JSON документ для указанного типа
+    // Получение КОНСТАНТНОЙ ссылки на JSON документ для указанного типа
     // TODO: возвращаемое значение по дефолту нехорошее, но не критично, т.к. всегда передаем валидный тип
     const JsonDocument& ConfigManager::getConfigDocument(ConfigType type) const
     {
@@ -322,11 +334,10 @@ namespace farm::config
             default:
                 logger->log(farm::log::Level::Error, 
                           "[Config] Запрошен документ для неизвестного типа конфигурации");
-                return dataConfig; // Возвращаем документ по умолчанию
+                return dataConfig; 
         }
     }
     
-    // Загрузка дефолтной конфигурации
     bool ConfigManager::loadDefaultConfig(ConfigType type)
     {
         const char* defaultPath = getDefaultConfigPath(type);
@@ -362,13 +373,11 @@ namespace farm::config
         return success;
     }
 
-    // Загрузка конфигурации
     bool ConfigManager::loadConfig(ConfigType type)
     {
         const char* path = getConfigPath(type);
         auto& doc       = getConfigDocument(type);
         
-        // Сначала очищаем документ
         doc.clear();
         
         // Если файл не существует, пробуем загрузить дефолтную конфигурацию
@@ -381,7 +390,6 @@ namespace farm::config
         return loadJsonFromFile(path, doc);
     }
 
-    // Сохранение конфигурации
     bool ConfigManager::saveConfig(ConfigType type)
     {
         const char* path   = getConfigPath(type);
@@ -390,7 +398,6 @@ namespace farm::config
         return saveJsonToFile(path, doc);
     }
 
-    // Загрузка всех конфигураций
     bool ConfigManager::loadAllConfigs()
     {
         bool success = true;
@@ -404,7 +411,6 @@ namespace farm::config
         return success;
     }
 
-    // Сохранение всех конфигураций
     bool ConfigManager::saveAllConfigs()
     {
         bool success = true;
@@ -422,7 +428,6 @@ namespace farm::config
         return success;
     }
 
-    // Проверка существования ключа
     bool ConfigManager::hasKey(ConfigType type, const char* key) const
     {
         const auto& doc = getConfigDocument(type);
@@ -431,17 +436,17 @@ namespace farm::config
         return !doc[key].isNull();
     }
 
-    // Вывод текущей конфигурации для отладки
     void ConfigManager::printConfig(ConfigType type) const
     {
         const auto& doc = getConfigDocument(type);
         
-        // Сначала вычислить размер необходимого буфера
+        // Сначала вычисляем размер необходимого буфера
         size_t jsonSize = measureJsonPretty(doc);
-        // Затем создать строку нужного размера
+        
         String output;
-        output.reserve(jsonSize + 1); // +1 для нулевого терминатора
-        // И только потом сериализовать
+        output.reserve(jsonSize + 1); // +1 для нулевого символа
+        
+        // Сериализуем в строку нужного размера
         serializeJsonPretty(doc, output);
         
         // Проверяем, что размер вывода не превышает максимально допустимый размер буфера лога
@@ -466,7 +471,6 @@ namespace farm::config
         }
     }
 
-    // Получение JSON строки по типу конфигурации
     String ConfigManager::getConfigJson(ConfigType type) const
     {
         const auto& doc = getConfigDocument(type);
@@ -485,10 +489,8 @@ namespace farm::config
     // Перезапись JSON файла из строки
     bool ConfigManager::updateFromJson(ConfigType type, const String& jsonString)
     {
-        // Создаем временный JSON документ для десериализации входящих данных
         JsonDocument tempDoc;
         
-        // Десериализация входящей строки во временный документ
         DeserializationError error = deserializeJson(tempDoc, jsonString);
         if (error) 
         {
@@ -497,10 +499,10 @@ namespace farm::config
             return false;
         }
         
-        // Получаем ссылку на целевой документ
         auto& targetDoc = getConfigDocument(type);
         
         // Рекурсивная функция для слияния JSON объектов с любой глубиной вложенности
+        // TODO: написать функцию явно, а не использовать лямбду
         std::function<void(JsonVariant, JsonVariant)> mergeJson = 
             [&mergeJson](JsonVariant src, JsonVariant dest) 
             {
@@ -510,7 +512,6 @@ namespace farm::config
                     return;
                 }
                 
-                // Получаем объект-источник
                 JsonObject srcObj = src.as<JsonObject>();
                 
                 // Если целевой объект не существует, создаем его
@@ -519,7 +520,6 @@ namespace farm::config
                     dest.to<JsonObject>();
                 }
                 
-                // Получаем целевой объект
                 JsonObject destObj = dest.as<JsonObject>();
                 
                 // Обходим все ключи в источнике
@@ -531,7 +531,6 @@ namespace farm::config
                     // Если значение в источнике - объект, рекурсивно сливаем
                     if (srcValue.is<JsonObject>()) 
                     {
-                        // Рекурсивно вызываем слияние для вложенных объектов
                         mergeJson(srcValue, destObj[key]);
                     } 
                     // Если значение в источнике - массив, заменяем целиком
@@ -563,14 +562,12 @@ namespace farm::config
         #ifdef IOP_DEBUG
         Serial.println("Анализ файловой системы SPIFFS");
         
-        // Проверка, что SPIFFS смонтирована
         if (!SPIFFS.begin(true))
         {
             Serial.println("Ошибка при монтировании SPIFFS!");
             return;
         }
         
-        // Информация о файловой системе
         Serial.println("\n--- Информация о файловой системе ---");
         Serial.print("Общий размер: ");
         Serial.print(SPIFFS.totalBytes() / 1024);
@@ -584,7 +581,6 @@ namespace farm::config
         Serial.print((SPIFFS.totalBytes() - SPIFFS.usedBytes()) / 1024);
         Serial.println(" КБ");
         
-        // Вывод всех файлов
         Serial.println("\n--- Список файлов ---");
         File root = SPIFFS.open("/");
         File file = root.openNextFile();
@@ -604,7 +600,6 @@ namespace farm::config
             Serial.println("Содержимое:");
             Serial.println("--------------------------------------");
             
-            // Чтение и вывод содержимого файла
             while (file.available())
             {
                 String line = file.readStringUntil('\n');
@@ -613,7 +608,6 @@ namespace farm::config
             
             Serial.println("--------------------------------------");
             
-            // Переход к следующему файлу
             file = root.openNextFile();
         }
         

@@ -5,29 +5,24 @@
 
 namespace farm::sensors
 {
-    // Конструктор
     KY018::KY018(std::shared_ptr<log::ILogger> logger, uint8_t pin)
-        : pin(pin),
+        : ISensor(),
+          pin(pin),
           darkValue(calibration::KY018_DARK_VALUE),
           lightValue(calibration::KY018_LIGHT_VALUE)
     {
-        // Инициализация базового класса
         this->logger = logger;
         
-        // Устанавливаем параметры датчика
         setSensorName(names::KY018);
         setMeasurementType(json_keys::LIGHT_INTENSITY);
         setUnit(units::PERCENT);
         
-        // Устанавливаем флаги (стандартный датчик)
         shouldBeRead = true;
         shouldBeSaved = true;
 
-        // Инициализируем значение как "нет данных"
         lastMeasurement = calibration::NO_DATA;
     }
     
-    // Инициализация датчика
     bool KY018::initialize()
     {
         if (pin == calibration::UNINITIALIZED_PIN) 
@@ -37,14 +32,12 @@ namespace farm::sensors
             return false;
         }
 
-        // Настраиваем пин как вход
         pinMode(pin, INPUT);
         
         initialized = true;
         return true;
     }
     
-    // Установить калибровочные значения
     void KY018::setCalibration(int darkValue, int lightValue)
     {
         if (darkValue > lightValue) 

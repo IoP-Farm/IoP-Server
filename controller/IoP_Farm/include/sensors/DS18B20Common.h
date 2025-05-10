@@ -35,10 +35,7 @@ namespace farm::sensors
         // Если экземпляры не существуют, создаёт их
         static std::shared_ptr<DS18B20Resources> getInstance(int8_t pin, std::shared_ptr<ILogger> logger);
         
-        // Освобождение памяти для указанного пина
-        static void releaseInstance(int8_t pin);
-        
-        // Освобождение всей выделенной памяти
+        static void releaseInstance(int8_t pin);      
         static void releaseAll();
     };
 } 

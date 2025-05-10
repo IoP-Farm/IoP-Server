@@ -2,40 +2,33 @@
 
 namespace farm::sensors
 {
-    // Конструктор
     DS18B20::DS18B20(std::shared_ptr<log::ILogger> logger, uint8_t pin)
-        : pin(pin),
+        : ISensor(),
+          pin(pin),
           resources(nullptr)
     {
-        // Сохраняем логгер
         this->logger = logger;
         
-        // Устанавливаем параметры датчика
         setSensorName(names::DS18B20);
         setMeasurementType(json_keys::TEMPERATURE_DS18B20);
         setUnit(units::CELSIUS);
         
-        // Разрешаем считывание и сохранение данных
         shouldBeRead = true;
         shouldBeSaved = true;
         
-        // Инициализируем значение как "нет данных"
         lastMeasurement = calibration::NO_DATA;
         
         // Установка адреса устройства по умолчанию (все нули - использовать первое найденное устройство)
         memset(deviceAddress, 0, sizeof(deviceAddress));
     }
     
-    // Деструктор - не освобождаем ресурсы, они управляются DS18B20Common
     DS18B20::~DS18B20()
     {
         // Память будет освобождена автоматически благодаря std::shared_ptr
     }
     
-    // Инициализация датчика
     bool DS18B20::initialize()
     {
-        // Проверяем, что пин в допустимом диапазоне
         if (pin == calibration::UNINITIALIZED_PIN)
         {
             logger->log(Level::Error, 
@@ -43,7 +36,6 @@ namespace farm::sensors
             return false;
         }
         
-        // Получаем ресурсы из общего хранилища
         resources = DS18B20Common::getInstance(pin, logger);
         
         if (!resources)
@@ -63,13 +55,11 @@ namespace farm::sensors
                 return false;
             }
             
-            // Выводим адрес для отладки
-            char addressStr[24] = {0};
+            char addressStr[25] = {0};
             for (uint8_t i = 0; i < 8; i++)
             {
-                sprintf(addressStr + i*3, "%02X:", deviceAddress[i]);
+                sprintf(addressStr + i*3, "%02X%s", deviceAddress[i], (i < 7) ? ":" : "");
             }
-            addressStr[23] = '\0'; // Обрезаем последнее двоеточие
             
             logger->log(Level::Debug, 
                       "[DS18B20] Адрес устройства: %s", 
@@ -83,7 +73,6 @@ namespace farm::sensors
         return true;
     }
     
-    // Считать температуру
     float DS18B20::read()
     {
         if (!initialized || !resources)
@@ -94,7 +83,6 @@ namespace farm::sensors
             return calibration::SENSOR_ERROR_VALUE;
         }
         
-        // Запрашиваем температуру
         if (memcmp(deviceAddress, "\0\0\0\0\0\0\0\0", 8) == 0)
         {
             // Используем первый найденный датчик
@@ -110,7 +98,6 @@ namespace farm::sensors
                 return calibration::SENSOR_ERROR_VALUE;
             }
             
-            // Сохраняем значение
             lastMeasurement = temp;
             return temp;
         }
@@ -129,7 +116,6 @@ namespace farm::sensors
                 return calibration::SENSOR_ERROR_VALUE;
             }
             
-            // Сохраняем значение
             lastMeasurement = temp;
             return temp;
         }
@@ -143,12 +129,11 @@ namespace farm::sensors
             memcpy(deviceAddress, address, 8);
             
             // Выводим адрес для отладки
-            char addressStr[24] = {0};
+            char addressStr[25] = {0};
             for (uint8_t i = 0; i < 8; i++)
             {
-                sprintf(addressStr + i*3, "%02X:", deviceAddress[i]);
+                sprintf(addressStr + i*3, "%02X%s", deviceAddress[i], (i < 7) ? ":" : "");
             }
-            addressStr[23] = '\0'; // Обрезаем последнее двоеточие
             
             logger->log(Level::Debug, 
                       "[DS18B20] Установлен адрес устройства: %s", 

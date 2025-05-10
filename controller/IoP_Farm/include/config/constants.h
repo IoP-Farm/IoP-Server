@@ -1,4 +1,5 @@
-#pragma once
+#ifndef FARM_CONFIG_CONSTANTS_H
+#define FARM_CONFIG_CONSTANTS_H
 
 #include <Arduino.h>
 
@@ -116,14 +117,14 @@ namespace farm::config
         // Пины для датчиков
         namespace pins
         {
-            constexpr int8_t DHT22_PIN           = 4;  // Пин DHT22 (темп. и влажность) ex: 4
-            constexpr int8_t DS18B20_PIN         = 13;  // Пин DS18B20 (темп. воды) ex: 13
-            constexpr int8_t HC_SR04_TRIG_PIN    = 5;  // Пин HC-SR04 Trig ex: 5
-            constexpr int8_t HC_SR04_ECHO_PIN    = 18;  // Пин HC-SR04 Echo ex: 18
-            constexpr int8_t FC28_PIN            = 36;  // Пин FC-28 (влажность почвы) ex: 36
-            constexpr int8_t KY018_PIN           = 39;  // Пин KY-018 (освещённость) ex: 39
-            constexpr int8_t YFS401_PIN          = 22;  // Пин YF-S401 (расходомер) ex: 22
-            constexpr int8_t LED_PIN             = 2;   // Пин светодиода ex: 2
+            constexpr int8_t DHT22_PIN        =  5;   // Пин DHT22 (темп. и влажность) ex: 5
+            constexpr int8_t DS18B20_PIN      =  4;   // Пин DS18B20 (темп. воды) ex: 4
+            constexpr int8_t HC_SR04_TRIG_PIN = 14;   // Пин HC-SR04 Trig ex: 14
+            constexpr int8_t HC_SR04_ECHO_PIN = 15;   // Пин HC-SR04 Echo ex: 15
+            constexpr int8_t FC28_PIN         = 32;   // Пин FC-28 (влажность почвы) ex: 32
+            constexpr int8_t KY018_PIN        = 33;   // Пин KY-018 (освещённость) ex: 33
+            constexpr int8_t YFS401_PIN       = 16;   // Пин YF-S401 (расходомер) ex: 16
+            constexpr int8_t LED_PIN          =  2;   // Пин светодиода ex: 2
         }
 
         // Имена датчиков
@@ -141,24 +142,24 @@ namespace farm::config
         // JSON ключи для типов измерений
         namespace json_keys
         {
-            constexpr const char* TEMPERATURE_DHT22 = "temperature_DHT22";     // Температура воздуха
-            constexpr const char* TEMPERATURE_DS18B20 = "temperature_DS18B20"; // Температура воды
-            constexpr const char* HUMIDITY = "humidity";                       // Влажность воздуха
-            constexpr const char* WATER_LEVEL = "water_level";                 // Уровень воды
-            constexpr const char* SOIL_MOISTURE = "soil_moisture";             // Влажность почвы
-            constexpr const char* LIGHT_INTENSITY = "light_intensity";         // Интенсивность освещения
-            constexpr const char* WATER_FLOW = "water_flow";                   // Расход воды
+            constexpr const char* TEMPERATURE_DHT22   = "temperature_DHT22";     // Температура воздуха
+            constexpr const char* TEMPERATURE_DS18B20 = "temperature_DS18B20";   // Температура воды
+            constexpr const char* HUMIDITY            = "humidity";              // Влажность воздуха
+            constexpr const char* WATER_LEVEL         = "water_level";           // Уровень воды
+            constexpr const char* SOIL_MOISTURE       = "soil_moisture";         // Влажность почвы
+            constexpr const char* LIGHT_INTENSITY     = "light_intensity";       // Интенсивность освещения
+            constexpr const char* WATER_FLOW          = "water_flow";            // Расход воды
         }
 
         // Единицы измерения
         namespace units
         {
-            constexpr const char* CELSIUS = "°C";          // Градусы Цельсия
-            constexpr const char* PERCENT = "%";           // Проценты
-            constexpr const char* CENTIMETER = "см";       // Сантиметры
-            constexpr const char* LITER_PER_MINUTE = "л/мин"; // Литры в минуту
-            constexpr const char* MILLILITERS = "мл";       // Миллилитры
-            constexpr const char* LITERS = "л";             // Литры
+            constexpr const char* CELSIUS          = "°C";          // Градусы Цельсия
+            constexpr const char* PERCENT          = "%";           // Проценты
+            constexpr const char* CENTIMETER       = "см";          // Сантиметры
+            constexpr const char* LITER_PER_MINUTE = "л/мин";       // Литры в минуту
+            constexpr const char* MILLILITERS      = "мл";          // Миллилитры
+            constexpr const char* LITERS           = "л";           // Литры
         }
 
         // Калибровочные и другие константы для датчиков
@@ -182,7 +183,11 @@ namespace farm::config
             // формула: порог уровня воды(%) = (порог уровня воды(см) / глубина бака(см)) * 100%
             constexpr float HCSR04_FULL_TANK_PERCENT = (16.0f / HCSR04_DEFAULT_CONTAINER_DEPTH) * 100.0f; 
             // Скорость звука в воздухе при 20°C = 343 м/с = 0.0343 см/мкс
-            constexpr float SOUND_SPEED = 343.0f * 0.01f;
+            constexpr float SOUND_SPEED = 0.0343f;
+
+            // Коэффициенты калибровки для ультразвукового датчика HC-SR04
+            constexpr double HCSR04_A = 1.012736158038555;
+            constexpr double HCSR04_B = 1.1705495476420833;
             
             // Ошибочное значение для несинициализированных датчиков
             constexpr float SENSOR_ERROR_VALUE = -100.0f;
@@ -204,7 +209,78 @@ namespace farm::config
     // Константы для исполнительных устройств
     namespace actuators
     {
+        namespace names
+        {
+            constexpr const char* PUMP_R385 = "R385";
+            constexpr const char* HEATLAMP  = "HeatLamp";
+            constexpr const char* GROWLIGHT = "GrowLight";
+        }
         
+        namespace types
+        {
+            constexpr const char* WATER_PUMP = "Pump";
+            constexpr const char* HEATER     = "Heater";
+            constexpr const char* LIGHT      = "Light";
+        }
+
+        // Пины для актуаторов
+        namespace pins
+        {
+            constexpr int8_t PUMP_R385_FORWARD_PIN  = 18;     // Пин насоса R385 (прямой ход) ex: 1
+            constexpr int8_t PUMP_R385_BACKWARD_PIN = 19;     // Пин насоса R385 (обратный ход) ex: 19
+            constexpr int8_t HEATLAMP_PIN  = 21;              // Пин нагревательной лампы ex: 21
+            constexpr int8_t GROWLIGHT_PIN = 17;              // Пин фитоленты ex: 17
+        }
+        
+        // Константы для ActuatorsManager
+        constexpr unsigned long CHECK_INTERVAL = 10000; // Интервал проверки NTP в ActuatorsManager (мс)
+    }
+
+    // Константы для стратегий управления актуаторами
+    namespace strategies
+    {
+        // Константы для стратегии полива
+        namespace irrigation
+        {
+            constexpr float DEFAULT_MIN_WATER_LEVEL = 10.0f;       // Минимальный уровень воды для полива (%)
+            
+            constexpr uint32_t VOLUME_CHECK_INTERVAL_S = 1;        // Интервал проверки объема воды (в секундах)
+            constexpr uint32_t IRRIGATION_TIMEOUT_SEC  = 10;      // Таймаут полива (10 минут в секундах)
+            
+            // Ключи конфигурации
+            constexpr const char* CONFIG_KEY_INTERVAL     = "pump_interval_days";
+            constexpr const char* CONFIG_KEY_START_TIME   = "pump_start";
+            constexpr const char* CONFIG_KEY_WATER_VOLUME = "pump_volume_ml";
+        }
+        
+        // Константы для стратегии нагрева
+        namespace heating
+        {
+            constexpr float DEFAULT_HYSTERESIS = 2.0f;           // Гистерезис температуры (°C)
+            constexpr int   DEFAULT_CHECK_INTERVAL = 30;         // Интервал проверки температуры (сек)
+            
+            // Ключи конфигурации
+            constexpr const char* CONFIG_KEY_TARGET_TEMP = "heatlamp_target_temp";
+        }
+        
+        // Константы для стратегии освещения
+        namespace lighting
+        {
+            constexpr int DEFAULT_LIGHT_CYCLE_PERIOD = 24 * 3600;     // Период цикла освещения (сек)
+            
+            // Ключи конфигурации
+            constexpr const char* CONFIG_KEY_LIGHT_ON  = "growlight_on";
+            constexpr const char* CONFIG_KEY_LIGHT_OFF = "growlight_off";
+        }
+
+        // Общие константы для логирования
+        namespace logging
+        {
+            constexpr const char* PREFIX_IRRIGATION        = "[IrrigationStrategy] ";
+            constexpr const char* PREFIX_HEATING           = "[HeatingStrategy] ";
+            constexpr const char* PREFIX_LIGHTING          = "[LightingStrategy] ";
+            constexpr const char* PREFIX_ACTUATORS_MANAGER = "[ActuatorsManager] ";
+        }
     }
     
     // Константы для основного цикла
@@ -229,7 +305,9 @@ namespace farm::config
         GROWLIGHT_ON   = 3,  // Включить фитолампу
         GROWLIGHT_OFF  = 4,  // Выключить фитолампу
         HEATLAMP_ON    = 5,  // Включить лампу нагрева
-        HEATLAMP_OFF   = 6   // Выключить лампу нагрева
+        HEATLAMP_OFF   = 6,  // Выключить лампу нагрева
+        FARM_ON        = 7,  // Включить функциональность фермы
+        FARM_OFF       = 8   // Выключить функциональность фермы
     };
 }
 
@@ -271,10 +349,11 @@ namespace farm::log // это не конфиг, чисто для логгер�
         constexpr const char* STYLE_BOLD    = "\033[1m";
         
         // Константы для MQTT логгера
-        constexpr unsigned long MQTT_LOG_SEND_INTERVAL = 100000;  // Интервал отправки логов по MQTT (миллисекунды)
-        constexpr const char* MQTT_LOG_TOPIC_SUFFIX = "/log";   // Суффикс топика для отправки логов
+        constexpr unsigned long MQTT_LOG_SEND_INTERVAL = 1000;  // Интервал отправки логов по MQTT (миллисекунды)
         constexpr farm::log::Level MQTT_LOG_MIN_LEVEL = farm::log::Level::Debug; // Минимальный уровень для отправки в MQTT
         constexpr size_t MAX_BUFFER_SIZE = 100; // Максимальный размер буфера логов
         constexpr size_t MAX_PACKET_SIZE = 50; // Максимальное количество сообщений в одном пакете MQTT
     }
 } 
+
+#endif // FARM_CONFIG_CONSTANTS_H

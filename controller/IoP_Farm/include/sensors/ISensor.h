@@ -16,25 +16,16 @@ namespace farm::sensors
     class ISensor
     {
     protected:
-        // Имя датчика
         String sensorName;
-        
-        // Тип измеряемой величины
         String measurementType;
-
-        // Единица измерения
         String unit;
         
-        // Последнее измеренное значение
         float lastMeasurement;
         
-        // Логгер
         std::shared_ptr<log::ILogger> logger;
         
-        // Менеджер конфигурации
         std::shared_ptr<config::ConfigManager> configManager;
         
-        // Защищенные методы для установки параметров в наследниках
         void setSensorName(const String& name);
         void setMeasurementType(const String& type);
         void setUnit(const String& unit);
@@ -44,35 +35,29 @@ namespace farm::sensors
         bool shouldBeRead;
         bool shouldBeSaved;
         
-        // Флаг инициализации датчика
         bool initialized;
     public:
-        // Конструктор
         ISensor();
 
-        // Виртуальный деструктор
         virtual ~ISensor() = default;
+
+        virtual bool initialize() = 0;
         
         // Считать значение с датчика и записать в lastMeasurement, вернуть его
         virtual float read() = 0;
         
-        // Записать значение в память
+        // Записать значение в оперативную память
         virtual bool saveMeasurement();
         
-        // Получить последнее измеренное значение
         float getLastMeasurement() const;
         
-        // Получить название датчика
         String getSensorName() const;
         
-        // Получить тип измеряемой величины
         String getMeasurementType() const;
         
-        // Получить единицу измерения
         String getUnit() const;
         
-        // Инициализация датчика
-        virtual bool initialize() = 0;
+        
     };
 } 
 

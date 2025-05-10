@@ -2,10 +2,9 @@
 
 namespace farm::net
 {
-    // Инициализация статической переменной
+    // Инициализация статической переменной (паттерн Singleton)
     std::shared_ptr<OTAManager> OTAManager::instance = nullptr;
     
-    // Конструктор
     OTAManager::OTAManager(std::shared_ptr<farm::log::ILogger> logger)
         : logger(logger), initialized(false), lastWifiState(false)
     {
@@ -14,7 +13,7 @@ namespace farm::net
         }
     }
     
-    // Получение экземпляра синглтона
+    // Получение экземпляра (паттерн Singleton)
     std::shared_ptr<OTAManager> OTAManager::getInstance(std::shared_ptr<farm::log::ILogger> logger)
     {
         if (!instance) {
@@ -23,7 +22,6 @@ namespace farm::net
         return instance;
     }
     
-    // Инициализация OTA
     bool OTAManager::initialize()
     {
         if (!WiFi.isConnected())
@@ -34,7 +32,6 @@ namespace farm::net
         
         lastWifiState = true;
 
-        // Установка имени хоста из константы
         ArduinoOTA.setHostname(wifi::DEFAULT_HOSTNAME);
         
         // Обработчики ArduinoOTA
@@ -68,7 +65,7 @@ namespace farm::net
                 Serial.printf("[ArduinoOTA] ошибка завершения\n");
         });
         
-        // Запуск OTA
+        // Запуск самого OTA
         ArduinoOTA.begin();
 
         setPassword(wifi::DEFAULT_AP_PASSWORD);
@@ -78,22 +75,19 @@ namespace farm::net
         return true;
     }
     
-    // Установка имени хоста
     void OTAManager::setHostname(const String& name)
     {
         ArduinoOTA.setHostname(name.c_str());
     }
     
-    // Установка пароля
     void OTAManager::setPassword(const String& password)
     {
         ArduinoOTA.setPassword(password.c_str());
     }
     
-    // Обработка OTA-запросов
+    // Обработка OTA-запросов, вызывается из main.cpp в loop()
     void OTAManager::handle()
     {
-        // Получаем текущее состояние WiFi
         bool currentWifiState = WiFi.isConnected();
         
         // Проверяем, произошло ли переподключение WiFi
@@ -121,14 +115,13 @@ namespace farm::net
             initialize();
         }
         
-        // Обрабатываем OTA запросы только если WiFi подключен
+        // Обработка OTA запросов происходит только если WiFi подключен
         if (currentWifiState) 
         {
             ArduinoOTA.handle();
         }
     }
     
-    // Проверка состояния инициализации
     bool OTAManager::isInitialized() const
     {
         return initialized;

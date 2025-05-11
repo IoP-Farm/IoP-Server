@@ -14,7 +14,12 @@ cd logs_to_phone
 sh logs.sh
 cd ..
 
-./command_phone/COMMAND &
-./control_phone_config/CONFIG &
-./data_server_farm/DATA &
-./logs_to_phone/LOGS &
+cd farm_logger
+sh logger.sh
+cd ..
+
+nohup ./command_phone/COMMAND &
+nohup ./control_phone_config/CONFIG &
+nohup ./data_server_farm/DATA &
+nohup ./logs_to_phone/LOGS &
+nohup ./farm_logger/LOGGER &

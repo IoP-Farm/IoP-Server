@@ -26,12 +26,11 @@ struct SensorData {
 };
 #pragma pack(pop)
 
-// Реализация 64-битного преобразования endianness
 uint64_t htonll(uint64_t value) {
     static const int num = 42;
-    if (*reinterpret_cast<const char*>(&num) == num) { // Little-endian
+    if (*reinterpret_cast<const char*>(&num) == num) {
         return (static_cast<uint64_t>(htonl(value & 0xFFFFFFFF)) << 32) | htonl(value >> 32);
-    } else { // Big-endian
+    } else {
         return value;
     }
 }
@@ -60,7 +59,6 @@ public:
 
     std::vector<SensorData> get_data(int64_t unix_from, int64_t unix_to) {
         std::vector<SensorData> results;
-        
         sqlite3_stmt* stmt;
         const char* sql = "SELECT timestamp_unix, temperature_DHT22, "
                           "temperature_DS18B20, humidity, water_level, "
@@ -74,7 +72,32 @@ public:
             sqlite3_bind_int64(stmt, 2, unix_to);
 
             while(sqlite3_step(stmt) == SQLITE_ROW) {
-                SensorData data;
+                results.push_back({
+                    sqlite3_column_int64(stmt, 0),
+                    sqlite3_column_double(stmt, 1),
+                    sqlite3_column_double(stmt, 2),
+                    sqlite3_column_double(stmt, 3),
+                    sqlite3_column_double(stmt, 4),
+                    sqlite3_column_double(stmt, 5),
+                    sqlite3_column_double(stmt, 6)
+                });
+            }
+            sqlite3_finalize(stmt);
+        }
+        return results;
+    }
+
+    SensorData get_latest_data() {
+        SensorData data{};
+        sqlite3_stmt* stmt;
+        const char* sql = "SELECT timestamp_unix, temperature_DHT22, "
+                          "temperature_DS18B20, humidity, water_level, "
+                          "soil_moisture, light_intensity "
+                          "FROM sensor_data "
+                          "ORDER BY timestamp_unix DESC LIMIT 1;";
+
+        if(sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            if(sqlite3_step(stmt) == SQLITE_ROW) {
                 data.timestamp_unix = sqlite3_column_int64(stmt, 0);
                 data.temperature_DHT22 = sqlite3_column_double(stmt, 1);
                 data.temperature_DS18B20 = sqlite3_column_double(stmt, 2);
@@ -82,12 +105,10 @@ public:
                 data.water_level = sqlite3_column_double(stmt, 4);
                 data.soil_moisture = sqlite3_column_double(stmt, 5);
                 data.light_intensity = sqlite3_column_double(stmt, 6);
-                
-                results.push_back(data);
             }
             sqlite3_finalize(stmt);
         }
-        return results;
+        return data;
     }
 };
 
@@ -118,47 +139,30 @@ public:
 };
 
 void serialize_sensor_data(std::vector<char>& buffer, const SensorData& data) {
-    // Преобразование полей в сетевой порядок
     uint64_t net_timestamp = htonll(static_cast<uint64_t>(data.timestamp_unix));
-    uint64_t net_temp_dht, net_temp_ds, net_humidity, net_water, net_soil, net_light;
+    uint64_t net_fields[6];
     
-    memcpy(&net_temp_dht, &data.temperature_DHT22, sizeof(uint64_t));
-    memcpy(&net_temp_ds, &data.temperature_DS18B20, sizeof(uint64_t));
-    memcpy(&net_humidity, &data.humidity, sizeof(uint64_t));
-    memcpy(&net_water, &data.water_level, sizeof(uint64_t));
-    memcpy(&net_soil, &data.soil_moisture, sizeof(uint64_t));
-    memcpy(&net_light, &data.light_intensity, sizeof(uint64_t));
-    
-    net_temp_dht = htonll(net_temp_dht);
-    net_temp_ds = htonll(net_temp_ds);
-    net_humidity = htonll(net_humidity);
-    net_water = htonll(net_water);
-    net_soil = htonll(net_soil);
-    net_light = htonll(net_light);
+    memcpy(&net_fields[0], &data.temperature_DHT22, sizeof(double));
+    memcpy(&net_fields[1], &data.temperature_DS18B20, sizeof(double));
+    memcpy(&net_fields[2], &data.humidity, sizeof(double));
+    memcpy(&net_fields[3], &data.water_level, sizeof(double));
+    memcpy(&net_fields[4], &data.soil_moisture, sizeof(double));
+    memcpy(&net_fields[5], &data.light_intensity, sizeof(double));
 
-    // Запись в буфер
+    for(auto& field : net_fields) field = htonll(field);
+
     buffer.insert(buffer.end(), reinterpret_cast<char*>(&net_timestamp), 
-                  reinterpret_cast<char*>(&net_timestamp) + sizeof(net_timestamp));
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(&net_temp_dht), 
-                  reinterpret_cast<char*>(&net_temp_dht) + sizeof(net_temp_dht));
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(&net_temp_ds), 
-                  reinterpret_cast<char*>(&net_temp_ds) + sizeof(net_temp_ds));
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(&net_humidity), 
-                  reinterpret_cast<char*>(&net_humidity) + sizeof(net_humidity));
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(&net_water), 
-                  reinterpret_cast<char*>(&net_water) + sizeof(net_water));
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(&net_soil), 
-                  reinterpret_cast<char*>(&net_soil) + sizeof(net_soil));
-    buffer.insert(buffer.end(), reinterpret_cast<char*>(&net_light), 
-                  reinterpret_cast<char*>(&net_light) + sizeof(net_light));
+                 reinterpret_cast<char*>(&net_timestamp) + sizeof(net_timestamp));
+    for(auto& field : net_fields) {
+        buffer.insert(buffer.end(), reinterpret_cast<char*>(&field), 
+                     reinterpret_cast<char*>(&field) + sizeof(field));
+    }
 }
 
 void send_binary_data(tcp::socket& socket, const std::vector<SensorData>& data) {
-    // Отправка количества записей
     uint32_t count = htonl(static_cast<uint32_t>(data.size()));
     asio::write(socket, asio::buffer(&count, sizeof(count)));
 
-    // Сериализация и отправка данных
     std::vector<char> buffer;
     for(const auto& item : data) {
         serialize_sensor_data(buffer, item);
@@ -169,9 +173,12 @@ void send_binary_data(tcp::socket& socket, const std::vector<SensorData>& data) 
 }
 
 void handle_client(tcp::socket socket, Database& db, Logger& logger) {
+    std::string client_ip = "unknown";
     try {
-        std::string client_ip = socket.remote_endpoint().address().to_string();
-        
+        client_ip = socket.remote_endpoint().address().to_string();
+    } catch (...) {}
+
+    try {
         asio::streambuf buf;
         asio::read_until(socket, buf, '\n');
         
@@ -179,27 +186,37 @@ void handle_client(tcp::socket socket, Database& db, Logger& logger) {
         std::string request_str;
         std::getline(is, request_str);
         
-        auto request = json::parse(request_str);
-        if(!request.contains("unix_time_from") || !request.contains("unix_time_to")) {
-            throw std::runtime_error("Invalid request format");
-        }
-        
-        int64_t unix_from = request["unix_time_from"];
-        int64_t unix_to = request["unix_time_to"];
-        
-        if(unix_from > unix_to) {
-            throw std::runtime_error("Invalid time range");
+        bool valid_request = false;
+        int64_t unix_from = 0, unix_to = 0;
+        std::vector<SensorData> data;
+
+        try {
+            auto request = json::parse(request_str);
+            if(request.contains("unix_time_from") && request.contains("unix_time_to")) {
+                unix_from = request["unix_time_from"].get<int64_t>();
+                unix_to = request["unix_time_to"].get<int64_t>();
+                if(unix_from <= unix_to) {
+                    data = db.get_data(unix_from, unix_to);
+                    valid_request = true;
+                }
+            }
+        } catch (...) {}
+
+        if(!valid_request) {
+            data.push_back(db.get_latest_data());
+            unix_from = unix_to = 0;
         }
 
-        auto data = db.get_data(unix_from, unix_to);
         send_binary_data(socket, data);
-        
         logger.log(client_ip, unix_from, unix_to, data.size());
-        std::cout << "Sent " << data.size() 
-                 << " records to " << client_ip << std::endl;
+        std::cout << "Sent " << data.size() << " records to " << client_ip << std::endl;
     }
     catch(const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        try {
+            std::vector<SensorData> fallback_data{db.get_latest_data()};
+            send_binary_data(socket, fallback_data);
+            logger.log(client_ip, 0, 0, fallback_data.size());
+        } catch (...) {}
     }
 }
 

@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <thread>
+#include <unistd.h>
 
 using namespace std;
 using json = nlohmann::json;
@@ -95,7 +96,9 @@ int main() {
         client.subscribe(MQTT_TOPIC, 1);
         
         cout << "Service started. Press Enter to exit..." << endl;
-        cin.get();
+        while(true){
+		sleep(1);
+	}
 
         client.unsubscribe(MQTT_TOPIC)->wait();
         client.disconnect()->wait();

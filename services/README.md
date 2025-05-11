@@ -22,10 +22,11 @@ graph TD
     A[Датчики ESP32] -->|MQTT| B(MQTT-брокер)
     B --> C[IoP-Server]
     C --> D[(SQLite БД)]
-    C --> E[REST API]
+    
     C --> F[TCP API]
-    E --> G[Мобильное приложение]
+    
     F --> G
+
 ```
 
 ![Архитектура системы](./Mermaid Chart - Create complex, visual diagrams with text. A smarter way of creating diagrams.-2025-05-11-174247.svg)

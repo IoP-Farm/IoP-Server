@@ -29,8 +29,6 @@ graph TD
 
 ```
 
-![Архитектура системы](./Mermaid Chart - Create complex, visual diagrams with text. A smarter way of creating diagrams.-2025-05-11-174247.svg)
-
 Также необходимо запустить mqtt-server(например mosquitto) на 1883, а также снять ограничения файервола.
 
 Службы сервера:
